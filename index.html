@@ -1,0 +1,2182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>IBM FlashSystem — SV 9.1.2 Sizing</title>
+<style>
+/* ─── design tokens ─────────────────────────────── */
+:root{
+  --navy:#0b2545; --navy2:#163966; --navy3:#1e4b80;
+  --cyan:#00b4d8; --cyan-dim:rgba(0,180,216,.13);
+  --ink:#0d1b2a; --ink2:#1e3a5f;
+  --muted:#64748b; --faint:#94a3b8;
+  --line:#e2e8f0; --card:#f8fafc; --bg:#eef2f7; --white:#fff;
+  --green:#059669; --green-bg:#ecfdf5; --green-line:#a7f3d0;
+  --yellow:#FFD800; --yellow-bg:#FFFBE6; --yellow-line:#FFD800;
+  --red:#dc2626;   --red-bg:#fef2f2;   --red-line:#fecaca;
+  --purple:#7c3aed; --purple-bg:#f5f3ff; --purple-line:#ddd6fe;
+  --blue:#2563eb;  --blue-bg:#eff6ff;  --blue-line:#bfdbfe;
+  --radius:10px; --radius-sm:7px;
+  --shadow:0 1px 3px rgba(0,0,0,.07),0 4px 14px rgba(0,0,0,.06);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.06);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  background:var(--bg);color:var(--ink);line-height:1.5;min-height:100vh;
+  padding:16px 12px 56px;font-size:14px}
+.wrap{max-width:1280px;margin:0 auto}
+
+/* ─── header ── */
+header{
+  background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 55%,var(--navy3) 100%);
+  border-radius:var(--radius);padding:18px 22px;margin-bottom:18px;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.logo{width:38px;height:38px;background:var(--cyan);border-radius:9px;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.logo svg{width:20px;height:20px;fill:#fff}
+.hdr-text{flex:1;min-width:0}
+.hdr-text h1{font-size:16px;font-weight:700;color:#fff;line-height:1.3}
+.hdr-text p{font-size:11.5px;color:#94b3cc;margin-top:3px}
+.hdr-btns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn-ghost{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);
+  color:#d1e8f5;border-radius:6px;padding:6px 13px;font-size:12.5px;font-weight:500;cursor:pointer}
+.btn-ghost:hover{background:rgba(255,255,255,.16)}
+.btn-export{background:rgba(255,255,255,.08);border:1px solid rgba(0,180,216,.45);
+  color:#a8dff7;border-radius:6px;padding:6px 13px;font-size:12.5px;font-weight:500;cursor:pointer;
+  display:flex;align-items:center;gap:5px}
+.btn-export:hover{background:rgba(0,180,216,.18)}
+.btn-export svg{width:13px;height:13px;fill:currentColor;flex-shrink:0}
+.btn-cta{background:var(--cyan);border:none;color:var(--navy);
+  border-radius:6px;padding:6px 13px;font-size:12.5px;font-weight:700;cursor:pointer}
+.btn-cta:hover{opacity:.88}
+
+/* ─── legend strip ── */
+.legend{
+  display:flex;gap:16px;flex-wrap:wrap;align-items:center;
+  background:var(--white);border:1px solid var(--line);border-radius:var(--radius);
+  padding:9px 16px;margin-bottom:16px;font-size:11.5px;color:var(--muted)}
+.leg{display:flex;align-items:center;gap:5px}
+.leg-dot{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+.leg-dot.assumed{background:var(--purple)}
+.leg-dot.user{background:var(--cyan)}
+.leg-dot.ok{background:var(--green)}
+.leg-dot.warn{background:var(--yellow)}
+.leg-dot.bad{background:var(--red)}
+
+/* ─── page grid ── */
+.layout{display:grid;grid-template-columns:380px 1fr;gap:18px;align-items:start}
+@media(max-width:960px){.layout{grid-template-columns:1fr}}
+
+/* ─── input panel ── */
+.panel{background:var(--white);border:1px solid var(--line);
+  border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.panel-hdr{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:10px 15px;border-bottom:1px solid var(--line);
+  background:var(--card)}
+.panel-hdr-title{font-size:11px;font-weight:700;letter-spacing:.8px;
+  text-transform:uppercase;color:var(--muted)}
+.assumed-legend{font-size:10px;font-weight:600;color:var(--purple);
+  background:var(--purple-bg);border:1px solid var(--purple-line);
+  border-radius:999px;padding:2px 8px}
+
+.fields{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.grp{font-size:10px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;
+  color:var(--cyan);padding-bottom:2px;border-bottom:1px solid var(--cyan-dim);
+  margin-top:6px}
+.grp:first-child{margin-top:0}
+
+.fld label{display:flex;align-items:baseline;gap:4px;
+  font-size:12px;font-weight:500;color:var(--muted);margin-bottom:4px}
+.fld label .def{font-size:10.5px;font-weight:400;color:var(--faint)}
+.iw{display:flex;align-items:stretch;border:1.5px solid var(--line);
+  border-radius:var(--radius-sm);background:var(--white);overflow:hidden;
+  transition:border-color .15s,box-shadow .15s}
+.iw:focus-within{border-color:var(--cyan);box-shadow:0 0 0 3px var(--cyan-dim)}
+.iw input{flex:1;min-width:0;padding:8px 10px;border:none;background:transparent;
+  font-size:14px;font-variant-numeric:tabular-nums;color:var(--ink);outline:none}
+.iw input::placeholder{color:#c8d4e0}
+.iw select{flex:1;min-width:0;padding:8px 10px;border:none;background:transparent;
+  font-size:14px;color:var(--ink);outline:none;cursor:pointer;
+  -webkit-appearance:none;appearance:none}
+/* auto-filled (linked) input — shows value is derived */
+.iw input.linked{background:var(--purple-bg);color:var(--purple);font-weight:600}
+.unit{padding:0 10px;font-size:11.5px;font-weight:500;color:var(--muted);
+  background:var(--card);border-left:1.5px solid var(--line);
+  display:flex;align-items:center;white-space:nowrap;min-height:36px;flex-shrink:0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
+
+/* linked read/write % row */
+.rw-row{display:grid;grid-template-columns:1fr auto 1fr;gap:0;align-items:center;
+  border:1.5px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;
+  transition:border-color .15s,box-shadow .15s}
+.rw-row:focus-within{border-color:var(--cyan);box-shadow:0 0 0 3px var(--cyan-dim)}
+.rw-row input{flex:1;min-width:0;padding:8px 10px;border:none;background:transparent;
+  font-size:14px;font-variant-numeric:tabular-nums;color:var(--ink);outline:none;width:100%}
+.rw-row input.linked{background:var(--purple-bg);color:var(--purple);font-weight:600}
+.rw-divider{padding:0 8px;background:var(--card);border-left:1.5px solid var(--line);
+  border-right:1.5px solid var(--line);font-size:11px;color:var(--muted);
+  display:flex;align-items:center;height:100%;white-space:nowrap;gap:2px;min-height:36px}
+.rw-unit{font-size:11.5px;font-weight:500;color:var(--muted);background:var(--card);
+  display:flex;align-items:center;padding:0 8px;white-space:nowrap}
+.rw-labels{display:grid;grid-template-columns:1fr auto 1fr;gap:0;margin-bottom:3px}
+.rw-labels span{font-size:12px;font-weight:500;color:var(--muted)}
+.rw-labels span:last-child{text-align:right}
+
+details.adv{border-top:1px solid var(--line)}
+details.adv summary{padding:9px 15px;font-size:11.5px;font-weight:500;
+  color:var(--muted);cursor:pointer;user-select:none;
+  display:flex;align-items:center;gap:6px;list-style:none}
+details.adv summary::-webkit-details-marker{display:none}
+details.adv summary::before{content:'▶';font-size:8px;
+  display:inline-block;transition:transform .15s}
+details.adv[open] summary::before{transform:rotate(90deg)}
+details.adv[open] summary{color:var(--ink);font-weight:600}
+.adv-body{padding:0 15px 13px;display:flex;flex-direction:column;gap:9px}
+
+/* ─── results column ── */
+.results{display:flex;flex-direction:column;gap:14px}
+
+.res-card{background:var(--white);border:1px solid var(--line);
+  border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.res-card.ok  {border-top:3px solid var(--green)}
+.res-card.warn{border-top:3px solid var(--yellow)}
+.res-card.bad {border-top:3px solid var(--red)}
+.res-card.idle{border-top:3px solid var(--line)}
+.res-card.info{border-top:3px solid var(--blue)}
+
+.res-hdr{display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+  padding:10px 15px 9px;border-bottom:1px solid var(--line)}
+.badge{font-size:9.5px;font-weight:700;letter-spacing:.5px;
+  color:#fff;background:var(--navy);border-radius:4px;padding:2px 7px;flex-shrink:0}
+.res-hdr h3{font-size:13.5px;font-weight:700;color:var(--ink);flex:1;min-width:0}
+.verdict{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;
+  white-space:nowrap;flex-shrink:0;letter-spacing:.3px}
+.verdict.ok  {background:var(--green-bg);color:var(--green);border:1px solid var(--green-line)}
+.verdict.warn{background:var(--yellow-bg);color:var(--yellow);border:1px solid var(--yellow-line)}
+.verdict.bad {background:var(--red-bg);color:var(--red);border:1px solid var(--red-line)}
+.verdict.info{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-line)}
+.verdict.partial{background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-line)}
+
+/* idle placeholder */
+.idle-msg{padding:20px 18px;font-size:12.5px;color:var(--muted);
+  text-align:center;font-style:italic}
+
+/* ─── metric rows ── */
+.mrow{padding:7px 15px;border-bottom:1px solid var(--line)}
+.mrow:last-child{border-bottom:none}
+.mtop{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.mlbl{font-size:12px;color:var(--muted);line-height:1.4;flex:1;min-width:0}
+.mval{font-size:14.5px;font-weight:700;font-variant-numeric:tabular-nums;
+  color:var(--ink);text-align:right;white-space:nowrap;flex-shrink:0}
+.mval.big{font-size:17px;color:var(--navy2)}
+.mval.ok  {color:var(--green)}
+.mval.warn{color:var(--yellow)}
+.mval.bad {color:var(--red)}
+
+.mform{margin-top:3px;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  font-size:10.5px;color:#7a8fa8;background:var(--card);
+  border-radius:5px;padding:4px 8px;white-space:pre-wrap;word-break:break-all;
+  border:1px solid var(--line);line-height:1.5}
+
+/* assumed tag */
+.atag{display:inline-block;margin-left:5px;
+  font-size:9.5px;font-weight:600;
+  background:var(--purple-bg);color:var(--purple);
+  border:1px solid var(--purple-line);border-radius:3px;padding:0 4px;
+  vertical-align:middle;white-space:nowrap}
+
+/* section divider inside result cards */
+.res-section{padding:7px 15px 4px;background:var(--card);
+  border-bottom:1px solid var(--line);
+  font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+
+/* progress bar */
+.pbar-wrap{padding:4px 15px 10px}
+.pbar-track{height:8px;background:var(--line);border-radius:99px;overflow:hidden}
+.pbar-fill{height:100%;border-radius:99px;transition:width .3s}
+.pbar-fill.ok  {background:var(--green)}
+.pbar-fill.warn{background:var(--yellow)}
+.pbar-fill.bad {background:var(--red)}
+
+/* mode badge */
+.mode-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:5px 11px;border-radius:6px;font-size:12px;font-weight:700;
+  margin:8px 15px 4px}
+.mode-badge.sync{background:var(--green-bg);color:var(--green);border:1px solid var(--green-line)}
+.mode-badge.async{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-line)}
+.mode-badge.async-cycle{background:var(--yellow-bg);color:var(--yellow);border:1px solid var(--yellow-line)}
+.mode-badge::before{content:'●';font-size:8px}
+
+/* tip note */
+.tip-note{margin:0 15px 10px;padding:7px 10px;background:var(--blue-bg);
+  border-left:3px solid var(--blue);border-radius:0 5px 5px 0;
+  font-size:11.5px;color:var(--ink2);line-height:1.5}
+.tip-note.warn{background:var(--yellow-bg);border-left-color:var(--yellow)}
+.tip-note.ok  {background:var(--green-bg);border-left-color:var(--green)}
+
+/* ─── tips bar ── */
+.tips{background:var(--navy);border-radius:var(--radius);
+  padding:12px 16px;margin-top:16px;display:flex;flex-direction:column;gap:0}
+.tip{padding:6px 0;border-bottom:1px solid #1d3f60;font-size:11.5px;color:#94b3cc;line-height:1.5}
+.tip:last-child{border-bottom:none}
+.tip b{color:var(--cyan);font-weight:600}
+
+/* ─── Export bar ── */
+.export-bar{
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  background:var(--white);border:1px solid var(--line);border-radius:var(--radius);
+  padding:10px 16px;margin-top:16px;box-shadow:var(--shadow-sm)}
+.export-bar-label{font-size:11.5px;font-weight:600;color:var(--muted);margin-right:2px}
+.btn-exp{
+  display:inline-flex;align-items:center;gap:6px;
+  border-radius:6px;padding:7px 14px;font-size:12.5px;font-weight:600;cursor:pointer;
+  border:1.5px solid;transition:opacity .15s}
+.btn-exp:hover{opacity:.82}
+.btn-exp.xlsx{background:#e8f5e9;color:#1b5e20;border-color:#a5d6a7}
+.btn-exp.pdf {background:#e3f2fd;color:#0d47a1;border-color:#90caf9}
+.btn-exp svg{width:14px;height:14px;fill:currentColor;flex-shrink:0}
+
+/* footer */
+.foot{margin-top:12px;font-size:11px;color:var(--muted);text-align:center;line-height:1.8}
+.made-with{margin-top:18px;padding-top:10px;border-top:1px solid var(--line);
+  text-align:center;font-size:11px;color:var(--muted)}
+
+/* ─── Print / PDF styles ── */
+@media print{
+  body{background:#fff;padding:0;font-size:12px}
+  .wrap{max-width:100%}
+  header{background:#0b2545!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;
+    border-radius:0;padding:14px 18px}
+  .hdr-btns,.export-bar,.tips,.legend,.chart-vis-row,
+  .perf-inputs,.perf-sum-note{display:none!important}
+  .layout{grid-template-columns:340px 1fr;gap:14px}
+  .panel{box-shadow:none}
+  .res-card{page-break-inside:avoid;box-shadow:none}
+  .perf-section{page-break-before:always;box-shadow:none}
+  .perf-section>summary{display:flex;pointer-events:none}
+  .perf-section[open]>summary{border-bottom-color:var(--line)}
+  details.adv{display:none}
+  .foot,.made-with{display:block}
+  .charts-row{grid-template-columns:1fr 1fr}
+  .print-proposal-header{display:block!important}
+}
+.print-proposal-header{display:none;
+  background:#0b2545;color:#fff;padding:18px 22px;margin-bottom:16px;
+  border-radius:var(--radius);font-size:13px;line-height:1.6}
+.print-proposal-header h2{font-size:17px;font-weight:700;margin-bottom:4px;color:#fff}
+.print-proposal-header .pph-sub{color:#94b3cc;font-size:11.5px}
+.print-proposal-header .pph-meta{margin-top:10px;display:flex;gap:24px;flex-wrap:wrap}
+.print-proposal-header .pph-kv{display:flex;flex-direction:column;gap:1px}
+.print-proposal-header .pph-k{font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;color:#7aacc8;font-weight:600}
+.print-proposal-header .pph-v{font-size:13px;font-weight:700;color:#fff}
+
+/* ─── Mobile / iPad responsive ── */
+@media(max-width:600px){
+  body{padding:10px 6px 40px;font-size:15px}
+  header{padding:14px 14px;gap:10px}
+  .hdr-text h1{font-size:14px}
+  .hdr-text p{font-size:10.5px}
+  .hdr-btns{width:100%;justify-content:flex-end}
+  .legend{padding:8px 12px;gap:10px;font-size:10.5px}
+  .panel-hdr{padding:9px 12px}
+  .fields{padding:12px 12px;gap:12px}
+  .two{grid-template-columns:1fr}
+  .three{grid-template-columns:1fr}
+  .iw input,.rw-row input,.iw select{font-size:16px;padding:10px 10px}
+  .unit{font-size:11px;padding:0 8px;min-height:42px}
+  .rw-divider{min-height:42px}
+  .btn-ghost,.btn-cta{padding:8px 14px;font-size:13px}
+  .res-hdr{padding:10px 12px 9px}
+  .res-hdr h3{font-size:12.5px}
+  .mrow{padding:8px 12px}
+  .mval{font-size:13.5px}
+  .mval.big{font-size:15px}
+  .mform{font-size:10px;word-break:break-all}
+  .tips{padding:10px 12px}
+  .tip{font-size:10.5px}
+  .mode-badge{margin:8px 12px 4px}
+  .tip-note{margin:0 12px 10px}
+  .pbar-wrap{padding:4px 12px 10px}
+  .adv-body{padding:0 12px 13px}
+  details.adv summary{padding:9px 12px}
+}
+
+/* iPad portrait & mid-size tablets */
+@media(min-width:601px) and (max-width:960px){
+  .iw input,.rw-row input,.iw select{font-size:16px}
+  .fields{padding:14px 14px}
+}
+
+/* iOS: prevent zoom on input focus (requires font-size >= 16px on inputs) */
+@supports(-webkit-touch-callout:none){
+  .iw input,.rw-row input,.iw select{font-size:16px}
+}
+
+/* ─── Performance Scaling Charts section ─────────────────── */
+.perf-section{
+  background:var(--white);border:1px solid var(--line);
+  border-radius:var(--radius);box-shadow:var(--shadow);
+  margin-top:18px;overflow:hidden}
+.perf-section>summary{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:11px 16px;cursor:pointer;user-select:none;
+  background:var(--card);border-bottom:1px solid transparent;
+  list-style:none}
+.perf-section>summary::-webkit-details-marker{display:none}
+.perf-section[open]>summary{border-bottom-color:var(--line)}
+.perf-section>summary::before{
+  content:'▶';font-size:8px;color:var(--cyan);
+  display:inline-block;transition:transform .15s;flex-shrink:0}
+.perf-section[open]>summary::before{transform:rotate(90deg)}
+.perf-sum-title{font-size:13px;font-weight:700;color:var(--ink)}
+.perf-sum-note{font-size:11.5px;color:var(--muted);flex:1;min-width:0}
+.perf-body{padding:14px 16px;display:flex;flex-direction:column;gap:14px}
+.perf-inputs{display:grid;grid-template-columns:260px 200px;gap:12px;align-items:end}
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.chart-box{background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius-sm);padding:10px 6px 6px;overflow:hidden}
+.chart-legend-row{
+  display:flex;flex-wrap:wrap;gap:8px 18px;
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius-sm);padding:9px 14px;
+  font-size:11px;color:var(--muted)}
+.chart-leg-item{display:flex;align-items:center;gap:5px}
+.clc{display:inline-block;width:22px;height:3px;border-radius:2px;flex-shrink:0}
+.clf{display:inline-block;width:14px;height:10px;border-radius:2px;
+  flex-shrink:0;border:1px solid transparent}
+.clf.green{background:rgba(5,150,105,.14);border-color:rgba(5,150,105,.35)}
+.clf.yellow{background:rgba(255,216,0,.12);border-color:rgba(255,216,0,.45)}
+.clf.red{background:rgba(252,196,109,.18);border-color:rgba(252,196,109,.6)}
+.clf.gray{background:rgba(100,116,139,.1);border-color:rgba(100,116,139,.3)}
+.cldot{font-size:13px;font-weight:700;width:16px;text-align:center;
+  display:inline-block;color:var(--muted)}
+/* ── chart visibility toggle checkboxes ── */
+.chart-vis-row{
+  display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius-sm);padding:8px 14px}
+.cvis{display:flex;align-items:center;gap:6px;cursor:pointer;
+  font-size:11.5px;font-weight:500;color:var(--ink);user-select:none;
+  padding:3px 8px 3px 6px;border-radius:6px;border:1.5px solid var(--line);
+  background:var(--white);transition:border-color .15s,background .15s}
+.cvis:hover{background:#f0f4f8}
+.cvis input[type=checkbox]{width:14px;height:14px;cursor:pointer;accent-color:var(--cyan);flex-shrink:0}
+.cvis.dimmed{opacity:.4}
+.cvis-swatch{display:inline-block;width:20px;height:3px;border-radius:2px;flex-shrink:0}
+.cvis-divider{width:1px;height:22px;background:var(--line);flex-shrink:0}
+.chart-vis-label{font-size:10px;font-weight:700;letter-spacing:.7px;
+  text-transform:uppercase;color:var(--muted);margin-right:2px}
+
+@media(max-width:800px){.charts-row{grid-template-columns:1fr}}
+@media(max-width:600px){
+  .perf-inputs{grid-template-columns:1fr}
+  .perf-body{padding:12px 12px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ══ HEADER ══ -->
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3 3h18v3H3zM3 10.5h18v3H3zM3 18h18v3H3z"/>
+    </svg>
+  </div>
+  <div class="hdr-text">
+    <h1>IBM FlashSystem — Storage Virtualize 9.1.2 Sizing</h1>
+    <p>Local performance · Capacity · Policy-Based Replication (PBR) · Policy-Based HA (PBHA) · Enter what you know — defaults fill the rest</p>
+  </div>
+  <div class="hdr-btns">
+    <button class="btn-ghost" id="btnClear">Clear</button>
+    <button class="btn-cta"   id="btnSample">Load Sample</button>
+  </div>
+</header>
+
+<!-- ══ LEGEND ══ -->
+<div class="legend">
+  <span style="font-weight:600;color:var(--ink)">Key:</span>
+  <span class="leg"><span class="leg-dot assumed"></span>Purple tag = FS default assumed</span>
+  <span class="leg"><span class="leg-dot ok"></span>Green = within spec</span>
+  <span class="leg"><span class="leg-dot warn"></span>Yellow = marginal (70–90%)</span>
+  <span class="leg"><span class="leg-dot bad"></span>Red = over limit</span>
+</div>
+
+<div class="layout">
+
+<!-- ══ INPUT PANEL ══ -->
+<div class="panel">
+  <div class="panel-hdr">
+    <span class="panel-hdr-title">Workload inputs</span>
+    <span class="assumed-legend">purple = assumed default</span>
+  </div>
+
+  <div class="fields">
+
+    <div class="grp" style="margin-top:0">System model</div>
+
+    <div class="fld">
+      <label>FlashSystem model <span class="def">sets array ceilings</span></label>
+      <div class="iw"><select id="model">
+        <option value="fs9600">FlashSystem 9600 (5078-A40)</option>
+        <option value="fs7600">FlashSystem 7600 (5075-A30)</option>
+        <option value="fs5600">FlashSystem 5600 (5127-A20)</option>
+      </select></div>
+    </div>
+
+    <div class="grp">Performance</div>
+
+    <div class="fld">
+      <label>Total IOPS</label>
+      <div class="iw"><input id="iops" type="number" min="0" placeholder="e.g. 150 000"/><div class="unit">IOPS</div></div>
+    </div>
+
+    <div class="fld">
+      <div class="rw-labels">
+        <span>Read % <span style="font-size:10.5px;font-weight:400;color:var(--faint)">def 70</span></span>
+        <span></span>
+        <span>Write % <span style="font-size:10.5px;font-weight:400;color:var(--faint)">auto</span></span>
+      </div>
+      <div class="rw-row" id="rwRow">
+        <input id="readpct"  type="number" min="0" max="100" placeholder="70" />
+        <div class="rw-divider">R / W</div>
+        <input id="writepct" type="number" min="0" max="100" placeholder="30" />
+      </div>
+      <div style="font-size:10.5px;color:var(--faint);margin-top:3px">Fill either — the other auto-calculates to 100%</div>
+    </div>
+
+    <div class="fld">
+      <label>Block size <span class="def">def 8 KB</span></label>
+      <div class="iw"><input id="blkkb" type="number" min="0" step="0.5" placeholder="8"/><div class="unit">KB</div></div>
+    </div>
+
+    <div class="grp" style="margin-top:4px">Capacity</div>
+
+    <div class="two">
+      <div class="fld">
+        <label>Data today</label>
+        <div class="iw"><input id="capnow" type="number" min="0" placeholder="e.g. 200"/><div class="unit" title="Terabytes">TB</div></div>
+      </div>
+      <div class="fld">
+        <label>Growth <span class="def">optional, TB</span></label>
+        <div class="iw"><input id="capgrow" type="number" min="0" placeholder="0"/><div class="unit" title="Terabytes">TB</div></div>
+      </div>
+    </div>
+
+    <div class="two">
+      <div class="fld">
+        <label>Data reduction <span class="def">def 3:1</span></label>
+        <div class="iw"><input id="reduction" type="number" min="1" step="0.1" placeholder="3"/><div class="unit">: 1</div></div>
+      </div>
+      <div class="fld">
+        <label>Target usage <span class="def">def 80%</span></label>
+        <div class="iw"><input id="target" type="number" min="1" max="100" placeholder="80"/><div class="unit">%</div></div>
+      </div>
+    </div>
+
+    <div class="grp" style="margin-top:4px">Replication (PBR / PBHA)</div>
+
+    <div class="fld">
+      <label>RTT to DR site</label>
+      <div class="iw"><input id="rtt" type="number" min="0" placeholder="e.g. 10"/><div class="unit" title="Round-trip time in milliseconds">ms</div></div>
+    </div>
+
+    <div class="fld">
+      <label>WAN link speed</label>
+      <div class="iw"><input id="linkgbps" type="number" min="0" placeholder="e.g. 10"/><div class="unit" title="Gigabits per second">Gbps</div></div>
+    </div>
+
+    <div class="fld">
+      <label>Stream compression <span class="def">def 2:1</span></label>
+      <div class="iw"><input id="streamcomp" type="number" min="1" step="0.1" placeholder="2"/><div class="unit">: 1</div></div>
+    </div>
+
+  </div><!-- /fields -->
+
+  <!-- Advanced -->
+  <details class="adv">
+    <summary>FS9600 array ceilings (override)</summary>
+    <div class="adv-body">
+      <div class="two">
+        <div class="fld">
+          <label>IOPS ceiling <span class="def" id="defIops">6 300 000</span></label>
+          <div class="iw"><input id="ceiliops" type="number" placeholder="6300000"/><div class="unit">IOPS</div></div>
+        </div>
+        <div class="fld">
+          <label>Mixed derate <span class="def">60%</span></label>
+          <div class="iw"><input id="derate" type="number" placeholder="60"/><div class="unit">%</div></div>
+        </div>
+      </div>
+      <div class="two">
+        <div class="fld">
+          <label>BW ceiling <span class="def" id="defBw">86 GB/s</span></label>
+          <div class="iw"><input id="ceilbw" type="number" placeholder="86"/><div class="unit">GB/s</div></div>
+        </div>
+        <div class="fld">
+          <label>Max effective cap <span class="def" id="defPbe">11.8 PBe</span></label>
+          <div class="iw"><input id="maxpbe" type="number" placeholder="11.8"/><div class="unit">PBe</div></div>
+        </div>
+      </div>
+      <div class="two">
+        <div class="fld">
+          <label>PBHA sync RTT limit <span class="def">≤ 1 ms</span></label>
+          <div class="iw"><input id="syncrtt" type="number" step="0.1" placeholder="1"/><div class="unit">ms</div></div>
+        </div>
+        <div class="fld">
+          <label>PBR async max RTT <span class="def">80 ms</span></label>
+          <div class="iw"><input id="asyncrtt" type="number" placeholder="80"/><div class="unit">ms</div></div>
+        </div>
+      </div>
+      <div class="fld">
+        <label>Node memory <span class="def" id="defMem">1 536 GB</span></label>
+        <div class="iw"><input id="nodemem" type="number" placeholder="1536"/><div class="unit">GB</div></div>
+      </div>
+    </div>
+  </details>
+
+</div><!-- /panel -->
+
+<!-- ══ RESULTS ══ -->
+<div class="results">
+
+  <!-- R1: Local Performance -->
+  <div class="res-card idle" id="card1">
+    <div class="res-hdr">
+      <span class="badge">PERF</span>
+      <h3>Local Performance — Can the system handle this workload?</h3>
+      <span class="verdict" id="v1"></span>
+    </div>
+    <div id="b1"><div class="idle-msg">Enter Total IOPS to see performance analysis.</div></div>
+  </div>
+
+  <!-- R2: Capacity -->
+  <div class="res-card idle" id="card2">
+    <div class="res-hdr">
+      <span class="badge">CAP</span>
+      <h3>Capacity — Will data fit with room to grow?</h3>
+      <span class="verdict" id="v2"></span>
+    </div>
+    <div id="b2"><div class="idle-msg">Enter Data today (TB) to see capacity analysis.</div></div>
+  </div>
+
+  <!-- R3: PBR / PBHA Replication -->
+  <div class="res-card idle" id="card3">
+    <div class="res-hdr">
+      <span class="badge">REPL</span>
+      <h3>Policy-Based Replication &amp; HA — Mode, bandwidth &amp; buffer</h3>
+      <span class="verdict" id="v3"></span>
+    </div>
+    <div id="b3"><div class="idle-msg">Enter RTT to DR site to see replication analysis.</div></div>
+  </div>
+
+  <!-- R4: Memory -->
+  <div class="res-card idle" id="card4">
+    <div class="res-hdr">
+      <span class="badge">MEM</span>
+      <h3>System Memory — Cache &amp; PBHA journal impact</h3>
+      <span class="verdict" id="v4"></span>
+    </div>
+    <div id="b4"><div class="idle-msg">Enter IOPS and RTT to see memory analysis.</div></div>
+  </div>
+
+</div><!-- /results -->
+</div><!-- /layout -->
+
+<!-- ══ PERFORMANCE SCALING CHARTS ══════════════════════════ -->
+<details class="perf-section" id="perfSection" open>
+  <summary>
+    <span class="perf-sum-title">Performance Scaling &amp; Model Comparison</span>
+    <span class="perf-sum-note">Estimated latency vs. load — all three models overlaid · see today's workload and where growth hits the hockey stick</span>
+  </summary>
+  <div class="perf-body">
+
+    <!-- Growth projection inputs -->
+    <div class="perf-inputs">
+      <div class="fld">
+        <label>IOPS growth rate <span class="def">(for projected-workload dot)</span></label>
+        <div class="iw"><input id="pg_rate" type="number" min="0" max="500" placeholder="e.g. 20"/><div class="unit">% / yr</div></div>
+      </div>
+      <div class="fld">
+        <label>Projection horizon</label>
+        <div class="iw"><input id="pg_yrs" type="number" min="1" max="10" placeholder="3"/><div class="unit">years</div></div>
+      </div>
+    </div>
+
+    <!-- Chart pair -->
+    <div class="charts-row">
+      <div class="chart-box"><div id="chartIops"></div></div>
+      <div class="chart-box"><div id="chartBw"></div></div>
+    </div>
+
+    <!-- Visibility toggles -->
+    <div class="chart-vis-row">
+      <span class="chart-vis-label">Show:</span>
+      <!-- IB Flash model lines -->
+      <label class="cvis" id="cvis_fs9600">
+        <input type="checkbox" id="chk_fs9600" checked/>
+        <span class="cvis-swatch" style="background:#00b4d8"></span>
+        FlashSystem 9600
+      </label>
+      <label class="cvis" id="cvis_fs7600">
+        <input type="checkbox" id="chk_fs7600" checked/>
+        <span class="cvis-swatch" style="background:#7c3aed"></span>
+        FlashSystem 7600
+      </label>
+      <label class="cvis" id="cvis_fs5600">
+        <input type="checkbox" id="chk_fs5600" checked/>
+        <span class="cvis-swatch" style="background:#f59e0b"></span>
+        FlashSystem 5600
+      </label>
+      <span class="cvis-divider"></span>
+      <!-- X-axis / workload reference -->
+      <label class="cvis" id="cvis_xaxis">
+        <input type="checkbox" id="chk_xaxis" checked/>
+        Total I/Ops axis
+      </label>
+      <label class="cvis" id="cvis_now">
+        <input type="checkbox" id="chk_now" checked/>
+        <span class="cldot" style="font-size:12px">●</span>NOW dot
+      </label>
+      <label class="cvis" id="cvis_proj">
+        <input type="checkbox" id="chk_proj" checked/>
+        <span class="cldot" style="font-size:12px">○</span>+Nyr dot
+      </label>
+    </div>
+    <!-- Zone key -->
+    <div class="chart-legend-row">
+      <span class="chart-leg-item"><span class="clf green"></span>Comfortable (&lt;derate)</span>
+      <span class="chart-leg-item"><span class="clf yellow"></span>Marginal</span>
+      <span class="chart-leg-item"><span class="clf red"></span>Latency-impacting</span>
+      <span class="chart-leg-item"><span class="clf gray"></span>Grid territory</span>
+      <div style="width:100%;margin-top:4px;font-size:10.5px;color:var(--faint);font-style:italic">
+        Latency curves are illustrative (queueing-theory model) — convey shape of the hockey stick and relative model capacity, not guaranteed SLAs. Confirm with IBM Configurator.
+      </div>
+    </div>
+  </div>
+</details>
+
+<!-- ══ EXPORT BAR ══ -->
+<div class="export-bar" id="exportBar">
+  <span class="export-bar-label">Export:</span>
+  <button class="btn-exp xlsx" id="btnExcelExport">
+    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM8.1 17l1.9-3.1L8.1 10.9h1.5L11 13.1l1.4-2.2h1.5L12 13.9 13.9 17h-1.5L11 14.7 9.6 17H8.1z"/></svg>
+    Export to Excel
+  </button>
+  <button class="btn-exp pdf" id="btnPdfExport">
+    <svg viewBox="0 0 24 24"><path d="M20 2H8a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm-8.5 7.5c0 .83-.67 1.5-1.5 1.5H9v2H7.5V7H10c.83 0 1.5.67 1.5 1.5v1zm5 2c0 .83-.67 1.5-1.5 1.5h-2.5V7H15c.83 0 1.5.67 1.5 1.5v3zm4-3H19v1h1.5V11H19v2h-1.5V7h3v1.5zM9 9.5h1v-1H9v1zM4 6H2v14a2 2 0 0 0 2 2h14v-2H4V6zm10 5.5h1v-3h-1v3z"/></svg>
+    Export Proposal PDF
+  </button>
+  <span style="font-size:11px;color:var(--faint);margin-left:4px">Excel opens in any spreadsheet app · PDF via browser print dialog</span>
+</div>
+
+<!-- hidden print-only proposal header — populated by JS before printing -->
+<div class="print-proposal-header" id="printHeader"></div>
+
+<!-- tips -->
+<div class="tips">
+  <div class="tip"><b>IOPS → Throughput:</b> (IOPS ÷ 1 000) × block KB = MB/s &nbsp;·&nbsp; e.g. 150 000 IOPS × 8 KB = 1 200 MB/s = 9.6 Gbps</div>
+  <div class="tip"><b>PBHA (sync):</b> RTT ≤ 1 ms → synchronous, RPO = 0 (metro distance — app waits for the far site on every write). Buffer = write MB/s × RTT ms × 2 ÷ 1 000. Replication follows <em>writes</em>, not capacity.</div>
+  <div class="tip"><b>PBR (async):</b> 1 ms < RTT ≤ 80 ms → asynchronous. <em>Journaling</em> (link keeps up, RPO = seconds) vs <em>Cycling</em> (link lags, snapshot-based, larger RPO). Beyond 80 ms RTT, PBR is not supported.</div>
+  <div class="tip"><b>Link usable ≈ 80%:</b> 10 GbE → ~1 000 MB/s usable &nbsp;·&nbsp; 25 GbE → ~2 500 MB/s &nbsp;·&nbsp; 100 GbE → ~10 000 MB/s</div>
+</div>
+
+<div class="foot">
+  <span id="footModel">IBM FlashSystem 9600 (5078-A40) · Storage Virtualize 9.1.2</span><br/>
+  All values are estimates for pre-sales sizing. Confirm with IBM Configurator and the v9.1.x configuration limits for final BOM.
+</div>
+<div class="made-with">Made with IBM Bob</div>
+
+</div><!-- /wrap -->
+
+<script>
+(function(){
+'use strict';
+
+/* ══ FS9600 defaults ══════════════════════════════ */
+/* ══ Per-model hardware ceilings (FS9600 / FS7600 / FS5600, single enclosure) ══ */
+const MODELS = {
+  fs9600:{ name:'FlashSystem 9600', mtm:'5078-A40',
+           ceiliops:6_300_000, ceilbw:86, maxpbe:11.8, gridpbe:377, nodemem:1_536 },
+  fs7600:{ name:'FlashSystem 7600', mtm:'5075-A30',
+           ceiliops:4_300_000, ceilbw:55, maxpbe:7.2,  gridpbe:230, nodemem:768   },
+  fs5600:{ name:'FlashSystem 5600', mtm:'5127-A20',
+           ceiliops:2_600_000, ceilbw:30, maxpbe:2.5,  gridpbe:77,  nodemem:512   },
+};
+
+/* ══ Software / workload defaults — common to all models (Storage Virtualize 9.1.2) ══ */
+const SHARED = {
+  derate:     60,         // % of IOPS ceiling usable for mixed workloads
+  syncrtt:    1,          // ms: PBHA synchronous only at very low RTT (≤ this); metro distance
+  asyncrtt:   80,         // ms: PBR asynchronous max supported RTT; beyond this not supported
+  readpct:    70,         // % reads assumed (typical OLTP)
+  blkkb:      8,          // KB average block size
+  streamcomp: 2.0,        // stream compression ratio
+  reduction:  3.0,        // data reduction ratio (dedupe + compression)
+  target:     80,         // % max capacity target
+};
+
+let modelKey = 'fs9600';
+let FS = Object.assign({}, SHARED, MODELS[modelKey]);
+
+/* Memory model constants (SV 9.1.2) */
+const MEM = {
+  cacheReserve:  0.20,    // 20% of node memory reserved for OS + metadata
+  writeCache:    0.15,    // 15% of usable cache allocated to write cache
+  perVolumeKB:   64,      // ~64 KB overhead per volume (metadata)
+};
+
+/* Sample */
+const SAMPLE = {
+  iops:150_000, readpct:70, blkkb:8,
+  capnow:200, capgrow:50, reduction:3.5, target:80,
+  rtt:12, linkgbps:10, streamcomp:2.0
+};
+
+/* ══ helpers ══ */
+const $ = id => document.getElementById(id);
+
+/* read user field; returns null if empty/invalid */
+function gn(id){ const v=parseFloat($(id).value); return isFinite(v)&&v>0?v:null; }
+function gn0(id){ const v=parseFloat($(id).value); return isFinite(v)&&v>=0?v:null; }
+
+/* get value with fallback + assumed flag */
+function get(id,def){
+  const v=parseFloat($(id).value);
+  if(isFinite(v)&&v>0) return {val:v,assumed:false};
+  return {val:def,assumed:true};
+}
+
+/* ══ Read / Write % linked inputs ══
+   Last-edited field is the "source". The other is auto-computed and shown
+   with the purple .linked style. Both always sum to 100.
+   We track which field the user last touched via a flag. */
+let rwLastEdited = null; // 'read' | 'write' | null
+
+function syncRW(source){
+  const rEl=$('readpct'), wEl=$('writepct');
+  const v=parseFloat(source==='read'?rEl.value:wEl.value);
+  if(!isFinite(v)||v<0||v>100){
+    // invalid — just clear the linked field and remove style
+    if(source==='read'){ wEl.value=''; wEl.classList.remove('linked'); }
+    else               { rEl.value=''; rEl.classList.remove('linked'); }
+    return;
+  }
+  const complement=(100-v).toFixed(1).replace(/\.0$/,'');
+  if(source==='read'){
+    wEl.value=complement;
+    wEl.classList.add('linked');
+    rEl.classList.remove('linked');
+    rwLastEdited='read';
+  } else {
+    rEl.value=complement;
+    rEl.classList.add('linked');
+    wEl.classList.remove('linked');
+    rwLastEdited='write';
+  }
+}
+
+/* getReadPct — returns {val, assumed} honouring whichever field was filled */
+function getReadPct(){
+  // If either field has a valid user value use it
+  const rv=parseFloat($('readpct').value);
+  const wv=parseFloat($('writepct').value);
+  if(isFinite(rv)&&rv>=0&&rv<=100) return {val:rv,assumed:false};
+  if(isFinite(wv)&&wv>=0&&wv<=100) return {val:100-wv,assumed:false};
+  return {val:FS.readpct,assumed:true};
+}
+
+const fmt=(n,dp=1)=>n==null?'—':n.toLocaleString('en-US',{maximumFractionDigits:dp,minimumFractionDigits:0});
+const pct=n=>n==null?'—':n.toFixed(1)+'%';
+const atag=a=>a?'<span class="atag">assumed</span>':'';
+
+function stateOf(util){
+  if(util<=70) return 'ok';
+  if(util<=90) return 'warn';
+  return 'bad';
+}
+
+function bar(util,state){
+  const w=Math.min(util,100).toFixed(1);
+  return `<div class="pbar-wrap"><div class="pbar-track"><div class="pbar-fill ${state}" style="width:${w}%"></div></div></div>`;
+}
+
+function row(lbl,val,form,big,valClass){
+  return `<div class="mrow">
+    <div class="mtop">
+      <span class="mlbl">${lbl}</span>
+      <span class="mval${big?' big':''}${valClass?' '+valClass:''}">${val}</span>
+    </div>
+    ${form?`<div class="mform">${form}</div>`:''}
+  </div>`;
+}
+
+function section(title){
+  return `<div class="res-section">${title}</div>`;
+}
+
+/* ══════════════════════════════════════════════════
+   CARD 1 — Local Performance
+   Needs: iops
+   Assumes: readpct, blkkb, ceiliops, derate, ceilbw
+══════════════════════════════════════════════════ */
+function calcPerf(){
+  const iops=gn('iops');
+  const card=$('card1'),verd=$('v1'),body=$('b1');
+
+  if(iops==null){
+    card.className='res-card idle'; verd.className='verdict'; verd.textContent='';
+    body.innerHTML='<div class="idle-msg">Enter Total IOPS to see performance analysis.</div>';
+    return;
+  }
+
+  const rp =getReadPct();
+  const bk =get('blkkb',  FS.blkkb);
+  const cI =get('ceiliops',FS.ceiliops);
+  const cD =get('derate',  FS.derate);
+  const cBw=get('ceilbw',  FS.ceilbw);
+
+  const readpct  = rp.val;
+  const blkkb    = bk.val;
+  const writepct = 100-readpct;
+  const readIops = iops*(readpct/100);
+  const writeIops= iops*(writepct/100);
+
+  /* throughput: (IOPS ÷ 1000) × block KB = MB/s */
+  const totalMBs = (iops/1000)*blkkb;
+  const readMBs  = (readIops/1000)*blkkb;
+  const writeMBs = (writeIops/1000)*blkkb;
+  const totalGBs = totalMBs/1000;
+
+  /* utilisation */
+  const usableIops = cI.val*(cD.val/100);
+  const iopsUtil   = (iops/usableIops)*100;
+  const bwUtil     = (totalGBs/cBw.val)*100;
+  const worst      = Math.max(iopsUtil,bwUtil);
+  const state      = stateOf(worst);
+
+  card.className=`res-card ${state}`;
+  verd.className=`verdict ${state}`;
+  verd.textContent=state==='ok'?'FITS':state==='warn'?'MARGINAL':'OVER LIMIT';
+
+  /* write penalty note */
+  const writePenNote = writepct>50
+    ? '<div class="tip-note warn">Write-heavy workload (&gt;50% writes). NAND flash write amplification will reduce effective IOPS — consider conservative derate.</div>'
+    : '';
+
+  /* large block note */
+  const bwBottleneck = bwUtil>iopsUtil && bwUtil>60;
+  const bwNote = bwBottleneck
+    ? '<div class="tip-note warn">Bandwidth-bottlenecked workload. Large block sizes consume GB/s headroom faster than IOPS count suggests.</div>'
+    : '';
+
+  body.innerHTML=
+    section('IOPS breakdown')+
+    row(`Read IOPS${atag(rp.assumed)}`,
+        fmt(readIops,0)+' IOPS',
+        `${fmt(iops,0)} total × ${fmt(readpct,0)}% = ${fmt(readIops,0)} IOPS`)+
+    row(`Write IOPS${atag(rp.assumed)}`,
+        fmt(writeIops,0)+' IOPS',
+        `${fmt(iops,0)} total × ${fmt(writepct,0)}% = ${fmt(writeIops,0)} IOPS`)+
+
+    section('Throughput')+
+    row(`Total throughput${atag(bk.assumed)}`,
+        fmt(totalMBs,0)+' MB/s = '+fmt(totalGBs,2)+' GB/s',
+        `(${fmt(iops,0)} ÷ 1 000) × ${blkkb} KB = ${fmt(totalMBs,0)} MB/s${bk.assumed?' [block size assumed]':''}`,
+        true)+
+    row('  Read throughput',fmt(readMBs,0)+' MB/s',
+        `(${fmt(readIops,0)} ÷ 1 000) × ${blkkb} KB = ${fmt(readMBs,0)} MB/s`)+
+    row('  Write throughput',fmt(writeMBs,0)+' MB/s',
+        `(${fmt(writeIops,0)} ÷ 1 000) × ${blkkb} KB = ${fmt(writeMBs,0)} MB/s`)+
+
+    section('System headroom')+
+    row(`Usable IOPS ceiling${atag(cI.assumed||cD.assumed)}`,
+        fmt(usableIops,0)+' IOPS',
+        `${fmt(cI.val,0)} peak × ${cD.val}% derate = ${fmt(usableIops,0)} IOPS`)+
+    row('IOPS utilisation',pct(iopsUtil),null,true,stateOf(iopsUtil))+
+    bar(iopsUtil,stateOf(iopsUtil))+
+    row(`Bandwidth ceiling${atag(cBw.assumed)}`,fmt(cBw.val,0)+' GB/s')+
+    row('Bandwidth utilisation',pct(bwUtil),
+        `${fmt(totalGBs,2)} GB/s ÷ ${cBw.val} GB/s = ${pct(bwUtil)}`,
+        true,stateOf(bwUtil))+
+    bar(bwUtil,stateOf(bwUtil))+
+    writePenNote+bwNote;
+}
+
+/* ══════════════════════════════════════════════════
+   CARD 2 — Capacity
+   Needs: capnow
+   Assumes: reduction, target, maxpbe
+══════════════════════════════════════════════════ */
+function calcCap(){
+  const capnow=gn('capnow');
+  const card=$('card2'),verd=$('v2'),body=$('b2');
+
+  if(capnow==null){
+    card.className='res-card idle'; verd.className='verdict'; verd.textContent='';
+    body.innerHTML='<div class="idle-msg">Enter Data today (TB) to see capacity analysis.</div>';
+    return;
+  }
+
+  const gr=get('reduction',FS.reduction);
+  const tg=get('target',   FS.target);
+  const mx=get('maxpbe',   FS.maxpbe);
+  const rawGrow=gn0('capgrow');
+  const grow=rawGrow!=null?rawGrow:0;
+
+  const totalLogTB    = capnow+grow;
+  const physFlashTB   = totalLogTB/gr.val;            // physical flash consumed (uses user DRR)
+  const effWithHeadTB = totalLogTB/(tg.val/100);      // effective footprint incl. headroom
+  const effWithHeadPB = effWithHeadTB/1000;
+  const util          = (effWithHeadPB/mx.val)*100;   // effective demand ÷ effective ceiling
+  const state         = stateOf(util);
+
+  card.className=`res-card ${state}`;
+  verd.className=`verdict ${state}`;
+  verd.textContent=state==='ok'?'FITS':state==='warn'?'TIGHT':'TOO LARGE';
+
+  body.innerHTML=
+    section('Logical (effective) data')+
+    row('Total logical data',
+        fmt(totalLogTB,0)+' TB',
+        grow>0
+          ?`${fmt(capnow,0)} TB today + ${fmt(grow,0)} TB growth = ${fmt(totalLogTB,0)} TB`
+          :`${fmt(capnow,0)} TB (no growth specified)`)+
+
+    section('Physical flash (informational)')+
+    row(`Physical flash consumed${atag(gr.assumed)}`,
+        fmt(physFlashTB,1)+' TB',
+        `${fmt(totalLogTB,0)} TB logical ÷ ${gr.val}:1 DRR = ${fmt(physFlashTB,1)} TB of flash`)+
+
+    section('Effective capacity sizing')+
+    row(`Effective needed with headroom${atag(tg.assumed)}`,
+        fmt(effWithHeadTB,1)+' TB = '+fmt(effWithHeadPB,3)+' PBe',
+        `${fmt(totalLogTB,0)} TB ÷ ${tg.val}% target = ${fmt(effWithHeadTB,1)} TB → ÷ 1 000 = ${fmt(effWithHeadPB,3)} PBe`,
+        true)+
+
+    section('Array fit')+
+    row(`Array max effective capacity${atag(mx.assumed)}`,fmt(mx.val,1)+' PBe')+
+    row('Capacity utilisation',pct(util),
+        `${fmt(effWithHeadPB,3)} PBe ÷ ${fmt(mx.val,1)} PBe = ${pct(util)}`,
+        true,state)+
+    bar(util,state)+
+    `<div class="tip-note">💡 Fit compares your logical (effective) data against the array's effective capacity. The ${fmt(mx.val,1)} PBe ceiling assumes a reference data-reduction ratio — if your data reduces better or worse than your DRR suggests, realised effective capacity scales accordingly. A FlashSystem grid (up to 32 systems) scales to ~${FS.gridpbe} PBe.</div>`;
+}
+
+/* ══════════════════════════════════════════════════
+   CARD 3 — PBR / PBHA Replication
+   Needs: rtt
+   Assumes: streamcomp, blkkb, readpct (for write rate)
+   Uses: linkgbps if provided; iops for write rate
+══════════════════════════════════════════════════ */
+function calcRepl(){
+  const rtt=gn('rtt');
+  const card=$('card3'),verd=$('v3'),body=$('b3');
+
+  if(rtt==null){
+    card.className='res-card idle'; verd.className='verdict'; verd.textContent='';
+    body.innerHTML='<div class="idle-msg">Enter RTT to DR site to see replication analysis.</div>';
+    return;
+  }
+
+  const sc      =get('streamcomp',FS.streamcomp);
+  const syncLim =get('syncrtt',   FS.syncrtt);
+  const asyncLim=get('asyncrtt',  FS.asyncrtt);
+  const rp      =getReadPct();
+  const bk      =get('blkkb',     FS.blkkb);
+  const iops    =gn('iops');
+  const link    =gn('linkgbps');
+
+  /* replication mode determination (three bands) */
+  const isSync    = rtt<=syncLim.val;                 // PBHA synchronous (RPO 0)
+  const overAsync = rtt>asyncLim.val;                 // beyond PBR async support
+
+  /* derive write throughput if IOPS known */
+  let writeMBs=null, writeIops=null, writeAssumed=false;
+  if(iops!=null){
+    const writepct=100-rp.val;
+    writeIops  = iops*(writepct/100);
+    writeMBs   = (writeIops/1000)*bk.val;
+    writeAssumed = rp.assumed||bk.assumed;
+  }
+
+  /* on-wire and link calcs (only if writeMBs known) */
+  const onWireMBs  = writeMBs!=null ? writeMBs/sc.val     : null;
+  const onWireGbps = onWireMBs!=null? onWireMBs/125       : null;
+  const linkUsableMBs = link!=null   ? link*125*0.80       : null;
+  const linkUtil   = (onWireMBs!=null&&linkUsableMBs!=null)
+                       ? (onWireMBs/linkUsableMBs)*100 : null;
+  const bufferMB   = writeMBs!=null  ? writeMBs*(rtt/1000)*2 : null;
+  const bufferGB   = bufferMB!=null  ? bufferMB/1000 : null;
+
+  /* async sub-mode: journaling vs cycling */
+  let asyncMode='';
+  if(!isSync && onWireMBs!=null && linkUsableMBs!=null){
+    asyncMode = onWireMBs<=linkUsableMBs ? 'journaling' : 'cycling';
+  } else if(!isSync){
+    asyncMode = 'unknown'; /* can't tell without link data */
+  }
+
+  /* verdict */
+  let state, vtext;
+  if(overAsync){
+    state='bad'; vtext='RTT TOO HIGH';
+  } else if(linkUtil!=null){
+    state=stateOf(linkUtil);
+    vtext=state==='ok'?'FEASIBLE':state==='warn'?'MARGINAL':'OVER LINK';
+  } else if(onWireGbps!=null){
+    if(onWireGbps<=25)       {state='ok';  vtext='FEASIBLE';}
+    else if(onWireGbps<=100) {state='warn';vtext='HIGH BW';}
+    else                     {state='bad'; vtext='OVER 100G';}
+  } else {
+    state='info'; vtext='PARTIAL';
+  }
+
+  card.className=`res-card ${state}`;
+  verd.className=`verdict ${state==='info'?'partial':state}`;
+  verd.textContent=vtext;
+
+  /* mode badge */
+  const modeBadge = overAsync
+    ? `<div class="mode-badge async-cycle">RTT ${rtt} ms &gt; ${asyncLim.val} ms — beyond supported PBR async limit</div>`
+    : isSync
+      ? `<div class="mode-badge sync">PBHA SYNC — RPO = 0 · RTT ${rtt} ms ≤ ${syncLim.val} ms</div>`
+      : asyncMode==='journaling'
+        ? `<div class="mode-badge async">PBR ASYNC / JOURNALING — RPO = seconds · RTT ${rtt} ms</div>`
+        : asyncMode==='cycling'
+          ? `<div class="mode-badge async-cycle">PBR ASYNC / CYCLING — RPO = snapshot interval · bandwidth insufficient</div>`
+          : `<div class="mode-badge async">PBR ASYNC — ${syncLim.val} ms &lt; RTT ${rtt} ms ≤ ${asyncLim.val} ms</div>`;
+
+  let html = section('Replication mode')+modeBadge;
+
+  /* RTT row */
+  html+=row(`RTT vs thresholds${atag(syncLim.assumed||asyncLim.assumed)}`,
+    overAsync
+      ? `${rtt} ms > ${asyncLim.val} ms`
+      : isSync
+        ? `${rtt} ms ≤ ${syncLim.val} ms`
+        : `${syncLim.val} < ${rtt} ms ≤ ${asyncLim.val}`,
+    overAsync
+      ? `RTT ${rtt} ms exceeds PBR async max ${asyncLim.val} ms → replication not supported. Reduce distance or use externally orchestrated DR.`
+      : isSync
+        ? `RTT ${rtt} ms ≤ ${syncLim.val} ms → PBHA synchronous (RPO = 0, metro distance)`
+        : `${syncLim.val} ms < RTT ${rtt} ms ≤ ${asyncLim.val} ms → PBR asynchronous (RPO > 0)`);
+
+  if(writeMBs!=null){
+    html+=section('Replication bandwidth')+
+    row(`Write throughput${atag(writeAssumed)}`,
+        fmt(writeMBs,0)+' MB/s',
+        iops!=null
+          ?`${fmt(iops,0)} IOPS × ${(100-rp.val).toFixed(0)}% write = ${fmt(writeIops,0)} IOPS\n(${fmt(writeIops,0)} ÷ 1 000) × ${bk.val} KB = ${fmt(writeMBs,0)} MB/s`
+          :'(entered directly)')+
+    row(`On-wire after compression${atag(sc.assumed)}`,
+        fmt(onWireMBs,0)+' MB/s = '+fmt(onWireGbps,1)+' Gbps',
+        `${fmt(writeMBs,0)} MB/s ÷ ${sc.val} = ${fmt(onWireMBs,0)} MB/s → ÷ 125 = ${fmt(onWireGbps,1)} Gbps`,
+        true);
+  } else {
+    html+='<div class="tip-note">💡 Enter IOPS to compute write throughput and required link bandwidth.</div>';
+  }
+
+  if(linkUsableMBs!=null){
+    html+=section('Link capacity')+
+    row(`Link usable (${link} Gbps × 80%)`,
+        fmt(linkUsableMBs,0)+' MB/s',
+        `${link} Gbps × 125 MB/s/Gbps × 80% = ${fmt(linkUsableMBs,0)} MB/s`);
+    if(linkUtil!=null){
+      html+=row('Link utilisation',pct(linkUtil),
+          `${fmt(onWireMBs,0)} MB/s on-wire ÷ ${fmt(linkUsableMBs,0)} MB/s usable = ${pct(linkUtil)}`,
+          true,stateOf(linkUtil))+
+        bar(linkUtil,stateOf(linkUtil));
+    }
+    if(!isSync && writeMBs!=null){
+      html+=`<div class="tip-note ${asyncMode==='journaling'?'ok':'warn'}">
+        ${asyncMode==='journaling'
+          ?'✔ Link can keep up with change rate → PBR will use <strong>journaling mode</strong> (RPO in seconds).'
+          :'⚠ Link cannot keep up with change rate → PBR will fall back to <strong>cycling mode</strong> (snapshot-based, larger RPO). Increase link speed or reduce change rate.'}
+      </div>`;
+    }
+  } else if(writeMBs!=null){
+    html+='<div class="tip-note">💡 Enter WAN Link speed (Gbps) to check if the pipe can keep up and see link utilisation.</div>';
+  }
+
+  if(isSync && bufferMB!=null){
+    html+=section('PBHA journal buffer')+
+    row('Buffer needed (in-flight writes)',
+        fmt(bufferMB,0)+' MB = '+fmt(bufferGB,2)+' GB',
+        `write rate ${fmt(writeMBs,0)} MB/s × RTT ${rtt} ms × 2 ÷ 1 000 = ${fmt(bufferMB,0)} MB\n(RTT×2 accounts for round-trip acknowledgement latency)`,
+        true);
+  }
+
+  body.innerHTML=html;
+}
+
+/* ══════════════════════════════════════════════════
+   CARD 4 — System Memory
+   Needs: iops (for write cache sizing) OR rtt+writeMBs (for PBHA buffer)
+   Assumes: blkkb, readpct, nodemem
+══════════════════════════════════════════════════ */
+function calcMem(){
+  const iops   =gn('iops');
+  const rtt    =gn('rtt');
+  const card=$('card4'),verd=$('v4'),body=$('b4');
+
+  if(iops==null&&rtt==null){
+    card.className='res-card idle'; verd.className='verdict'; verd.textContent='';
+    body.innerHTML='<div class="idle-msg">Enter IOPS and/or RTT to see memory analysis.</div>';
+    return;
+  }
+
+  const nm   =get('nodemem', FS.nodemem);
+  const rp   =getReadPct();
+  const bk   =get('blkkb',   FS.blkkb);
+  const sc   =get('streamcomp',FS.streamcomp);
+  const syncLim=get('syncrtt',FS.syncrtt);
+
+  const totalMemGB   = nm.val;
+  const osReserveGB  = totalMemGB*MEM.cacheReserve;
+  const usableMemGB  = totalMemGB-osReserveGB;
+  const writeCacheGB = usableMemGB*MEM.writeCache;
+  const readCacheGB  = usableMemGB-writeCacheGB;
+
+  /* PBHA journal buffer */
+  let bufferGB=0, writeMBs=0, writeIops=0;
+  const rttKnown = rtt!=null;
+  const isSync   = rttKnown && rtt<=syncLim.val;
+
+  if(iops!=null){
+    const writepct=100-rp.val;
+    writeIops= iops*(writepct/100);
+    writeMBs = (writeIops/1000)*bk.val;
+  }
+
+  if(isSync && writeMBs>0){
+    const bufferMB = writeMBs*(rtt/1000)*2;
+    bufferGB = bufferMB/1000;
+  }
+
+  const totalUsedGB  = writeCacheGB+bufferGB;
+  const memUtil      = (totalUsedGB/usableMemGB)*100;
+  const state        = stateOf(memUtil);
+
+  card.className=`res-card ${state}`;
+  verd.className=`verdict ${state}`;
+  verd.textContent=state==='ok'?'OK':state==='warn'?'REVIEW':'TIGHT';
+
+  body.innerHTML=
+    section('Node memory allocation')+
+    row(`Total node memory${atag(nm.assumed)}`,fmt(totalMemGB,0)+' GB')+
+    row('OS + metadata reserve (20%)',
+        fmt(osReserveGB,0)+' GB',
+        `${fmt(totalMemGB,0)} GB × 20% = ${fmt(osReserveGB,0)} GB`)+
+    row('Usable for cache',
+        fmt(usableMemGB,0)+' GB',
+        `${fmt(totalMemGB,0)} − ${fmt(osReserveGB,0)} = ${fmt(usableMemGB,0)} GB`)+
+
+    section('Cache allocation')+
+    row('Write cache (15% of usable)',
+        fmt(writeCacheGB,1)+' GB',
+        `${fmt(usableMemGB,0)} GB × 15% = ${fmt(writeCacheGB,1)} GB`)+
+    row('Read cache (85% of usable)',
+        fmt(readCacheGB,1)+' GB',
+        `${fmt(usableMemGB,0)} GB × 85% = ${fmt(readCacheGB,1)} GB`)+
+
+    (iops!=null
+      ? section('Write throughput context')+
+        row(`Write IOPS${atag(rp.assumed)}`,
+            fmt(writeIops,0)+' IOPS',
+            `${fmt(iops,0)} × ${(100-rp.val).toFixed(0)}% = ${fmt(writeIops,0)} IOPS`)+
+        row(`Write throughput${atag(bk.assumed)}`,
+            fmt(writeMBs,0)+' MB/s',
+            `(${fmt(writeIops,0)} ÷ 1 000) × ${bk.val} KB = ${fmt(writeMBs,0)} MB/s`)
+      :'')+
+
+    (rttKnown
+      ? section('PBHA journal buffer (sync only)')+
+        row(`Replication mode${atag(syncLim.assumed)}`,
+            isSync?'PBHA SYNC — buffer required':'PBR ASYNC — no journal buffer')+
+        (isSync && writeMBs>0
+          ? row('PBHA journal buffer',
+                fmt(bufferGB*1000,0)+' MB = '+fmt(bufferGB,2)+' GB',
+                `${fmt(writeMBs,0)} MB/s × ${rtt} ms × 2 ÷ 1 000 = ${fmt(bufferGB*1000,0)} MB`)
+          : iops==null
+            ? '<div class="tip-note">💡 Enter IOPS to size the PBHA journal buffer.</div>'
+            : row('PBHA journal buffer','0 MB','PBR async — no synchronous journal buffer required'))
+      : '<div class="tip-note">💡 Enter RTT to determine if PBHA journal buffer memory is needed.</div>')+
+
+    section('Memory utilisation estimate')+
+    row('Memory consumed (cache + buffer)',
+        fmt(totalUsedGB,1)+' GB',
+        `${fmt(writeCacheGB,1)} GB write cache + ${fmt(bufferGB,2)} GB PBHA buffer = ${fmt(totalUsedGB,1)} GB`)+
+    row('Utilisation of usable memory',pct(memUtil),
+        `${fmt(totalUsedGB,1)} ÷ ${fmt(usableMemGB,0)} GB = ${pct(memUtil)}`,
+        true,state)+
+    bar(memUtil,state)+
+    (bufferGB>readCacheGB*0.05
+      ? '<div class="tip-note warn">PBHA buffer is consuming significant memory. For very high write rates with low RTT, validate buffer does not crowd out read cache. Consider async (PBR) if RTT allows.</div>'
+      : '');
+}
+
+/* ══════════════════════════════════════════════════
+   PERFORMANCE SCALING CHARTS
+   Three-model overlay: FS9600 / FS7600 / FS5600
+   X = IOPS or GB/s  |  Y = estimated latency (ms)
+   Latency model: M/D/1-inspired queueing curve —
+     flat in green zone, hockey-stick above derate point.
+     Values are illustrative; shape is what matters.
+══════════════════════════════════════════════════ */
+
+const CM=[
+  {key:'fs9600',label:'FS9600',color:'#00b4d8',ceiliops:6300000,ceilbw:86, baseMs:0.10},
+  {key:'fs7600',label:'FS7600',color:'#7c3aed',ceiliops:4300000,ceilbw:55, baseMs:0.12},
+  {key:'fs5600',label:'FS5600',color:'#f59e0b',ceiliops:2600000,ceilbw:30, baseMs:0.15},
+];
+
+/* ── visibility state (toggled by checkboxes) ── */
+const vis={
+  fs9600:true, fs7600:true, fs5600:true,
+  xaxis:true,  now:true,    proj:true
+};
+
+function latCurve(load,ceil,baseMs){
+  if(load<=0||ceil<=0) return baseMs;
+  const u=Math.min(load/ceil,0.9995);
+  return baseMs*(1+1.5*Math.pow(u,2)/Math.pow(1-u*0.98,1.1));
+}
+
+function niceY(v){
+  if(!v||v<=0) return 1;
+  const steps=[0.1,0.2,0.25,0.5,1,2,2.5,5,7.5,10,15,20,50,100];
+  const mag=Math.pow(10,Math.floor(Math.log10(v)));
+  for(const s of steps){const c=s*mag;if(c>=v*0.99)return c;}
+  return Math.ceil(v/10)*10;
+}
+
+function yTickVals(max){
+  if(max<=0)return [0];
+  const raw=max/5;
+  const mag=Math.pow(10,Math.floor(Math.log10(raw)));
+  const cands=[0.05,0.1,0.2,0.25,0.5,1,2,2.5,5,10,20,25,50].map(x=>x*mag);
+  const step=cands.find(x=>x>=raw)||raw;
+  const t=[];let v=0;
+  while(v<=max*1.001){t.push(parseFloat(v.toFixed(12)));v+=step;}
+  return t;
+}
+
+function xTickVals(max){
+  if(max<=0)return [0];
+  const raw=max/8;
+  const mag=Math.pow(10,Math.floor(Math.log10(raw)));
+  const cands=[1,2,2.5,5,10,20,25,50,100,200,250,500,1000,2500,5000,
+               10000,25000,50000,100000,200000,250000,500000,1000000,2000000].map(x=>x*mag);
+  const step=cands.find(x=>x>=raw)||raw;
+  const t=[];let v=0;
+  while(v<=max*1.001){t.push(parseFloat(v.toFixed(12)));v+=step;}
+  return t;
+}
+
+function fmtMs(v){return v<1?v.toFixed(2):v<10?v.toFixed(1):v.toFixed(0);}
+
+function fmtIOPS(v){
+  if(v===0)return '0';
+  if(v>=1000000)return (v/1000000).toFixed(1).replace(/\.0$/,'')+'M';
+  if(v>=1000)return (v/1000).toFixed(1).replace(/\.0$/,'')+'K';
+  return String(Math.round(v));
+}
+
+function buildChart(cfg){
+  const {uid,title,xMax,xLabel,xFmt,getCeil,currentX,projX,projYrs,deratePct}=cfg;
+  const W=640,H=315;
+  const ml=58,mr=38,mt=30,mb=56;
+  const pw=W-ml-mr,ph=H-mt-mb;
+
+  /* visible models for this render */
+  const visibleCM=CM.filter(m=>vis[m.key]);
+  /* use FS9600 for zone boundaries (always the widest reference, even if hidden) */
+  const refCM=CM[0];
+
+  /* Y range: base on 90th-percentile of each VISIBLE model's ceiling,
+     then expand if current/projected dots sit higher */
+  let rawY=0;
+  (visibleCM.length?visibleCM:CM).forEach(m=>{
+    const c=getCeil(m);
+    rawY=Math.max(rawY,latCurve(0.90*c,c,m.baseMs));
+  });
+  if(vis.now&&currentX!=null&&currentX>0){
+    (visibleCM.length?visibleCM:CM).forEach(m=>{
+      const c=getCeil(m);
+      rawY=Math.max(rawY,latCurve(Math.min(currentX,c*0.9995),c,m.baseMs));
+    });
+  }
+  if(vis.proj&&projX!=null&&projX>0){
+    (visibleCM.length?visibleCM:CM).forEach(m=>{
+      const c=getCeil(m);
+      rawY=Math.max(rawY,latCurve(Math.min(projX,c*0.9995),c,m.baseMs));
+    });
+  }
+  if(rawY<=0) rawY=1;
+  const yMax=niceY(rawY*1.2);
+
+  const sx=x=>ml+(Math.min(x,xMax)/xMax)*pw;
+  const sy=y=>mt+ph-(Math.min(y,yMax)/yMax)*ph;
+  const f=n=>n.toFixed(1);
+
+  /* Zone boundaries based on FS9600 (widest reference, fixed) */
+  const z9c=getCeil(refCM);
+  const zG=sx(z9c*(deratePct/100));
+  const zA=sx(z9c*0.875);
+  const zR=sx(z9c);
+  const zE=ml+pw;
+
+  const lbF=`font-size="9" font-weight="700" font-family="-apple-system,sans-serif"`;
+  const txF=`font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif"`;
+
+  let o=[];
+  o.push(`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">`);
+
+  /* clip path */
+  o.push(`<defs><clipPath id="cp${uid}"><rect x="${ml}" y="${mt}" width="${pw}" height="${ph}"/></clipPath></defs>`);
+
+  /* zone fills */
+  o.push(`<rect x="${ml}" y="${mt}" width="${f(Math.max(0,zG-ml))}" height="${ph}" fill="rgba(5,150,105,.07)"/>`);
+  o.push(`<rect x="${f(zG)}" y="${mt}" width="${f(Math.max(0,zA-zG))}" height="${ph}" fill="rgba(180,83,9,.07)"/>`);
+  o.push(`<rect x="${f(zA)}" y="${mt}" width="${f(Math.max(0,zR-zA))}" height="${ph}" fill="rgba(252,196,109,.13)"/>`);
+  if(zR<zE) o.push(`<rect x="${f(zR)}" y="${mt}" width="${f(zE-zR)}" height="${ph}" fill="rgba(100,116,139,.05)"/>`);
+
+  /* zone labels */
+  const lbY=mt+13;
+  o.push(`<text x="${ml+5}" y="${lbY}" ${lbF} fill="rgba(5,150,105,.8)">COMFORTABLE</text>`);
+  if(zA-zG>55) o.push(`<text x="${f((zG+zA)/2)}" y="${lbY}" text-anchor="middle" ${lbF} fill="rgba(180,83,9,.8)">MARGINAL</text>`);
+  if(zR-zA>35) o.push(`<text x="${f((zA+zR)/2)}" y="${lbY}" text-anchor="middle" ${lbF} fill="rgba(180,110,20,.85)">LATENCY↑</text>`);
+  if(zE-zR>45) o.push(`<text x="${f((zR+zE)/2)}" y="${lbY}" text-anchor="middle" ${lbF} fill="#94a3b8">GRID →</text>`);
+
+  /* Y grid */
+  yTickVals(yMax).forEach(t=>{
+    if(t===0)return;
+    const y=f(sy(t));
+    o.push(`<line x1="${ml}" y1="${y}" x2="${ml+pw}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>`);
+    o.push(`<text x="${ml-5}" y="${f(parseFloat(y)+3.5)}" text-anchor="end" font-size="9.5" fill="#94a3b8" ${txF}>${fmtMs(t)}</text>`);
+  });
+
+  /* vertical ceiling markers — only for visible models */
+  visibleCM.forEach(m=>{
+    const c=getCeil(m);
+    const x=sx(c);
+    if(x>ml&&x<=zE){
+      o.push(`<line x1="${f(x)}" y1="${mt}" x2="${f(x)}" y2="${mt+ph+5}" stroke="${m.color}" stroke-width="1.2" stroke-dasharray="5,3" opacity="0.5"/>`);
+      o.push(`<text x="${f(x-3)}" y="${mt+ph+23}" text-anchor="end" font-size="8.5" fill="${m.color}" font-weight="600" ${txF}>${m.label}</text>`);
+    }
+  });
+
+  /* curves — only for visible models */
+  const STEPS=280;
+  o.push(`<g clip-path="url(#cp${uid})">`);
+  visibleCM.forEach(m=>{
+    const c=getCeil(m);
+    const pts=[];
+    for(let i=0;i<=STEPS;i++){
+      const x=(i/STEPS)*c;
+      pts.push({x,y:latCurve(x,c,m.baseMs)});
+    }
+    const d=pts.map((p,i)=>(i===0?'M':'L')+f(sx(p.x))+','+f(sy(p.y))).join(' ');
+    o.push(`<path d="${d}" fill="none" stroke="${m.color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`);
+  });
+
+  /* projected dots (hollow) — only if proj is visible and there are visible models */
+  if(vis.proj&&projX!=null&&projX>0&&visibleCM.length){
+    let topY=Infinity,topX=0;
+    visibleCM.forEach(m=>{
+      const c=getCeil(m);
+      const px=Math.min(projX,c*0.9995);
+      const py=latCurve(px,c,m.baseMs);
+      const dx=f(sx(px)),dy=f(sy(py));
+      o.push(`<circle cx="${dx}" cy="${dy}" r="5" fill="white" stroke="${m.color}" stroke-width="2.5"/>`);
+      if(parseFloat(dy)<topY){topY=parseFloat(dy);topX=parseFloat(dx);}
+    });
+    o.push(`<text x="${f(topX)}" y="${f(topY-10)}" text-anchor="middle" font-size="9.5" fill="#334155" font-weight="700" ${txF}>+${projYrs}yr</text>`);
+  }
+
+  /* current dots (filled) — only if now is visible and there are visible models */
+  if(vis.now&&currentX!=null&&currentX>0&&visibleCM.length){
+    let topY=Infinity,topX=0;
+    visibleCM.forEach(m=>{
+      const c=getCeil(m);
+      const px=Math.min(currentX,c*0.9995);
+      const py=latCurve(px,c,m.baseMs);
+      const dx=f(sx(px)),dy=f(sy(py));
+      o.push(`<circle cx="${dx}" cy="${dy}" r="5.5" fill="${m.color}" stroke="white" stroke-width="2"/>`);
+      if(parseFloat(dy)<topY){topY=parseFloat(dy);topX=parseFloat(dx);}
+    });
+    o.push(`<text x="${f(topX)}" y="${f(topY-10)}" text-anchor="middle" font-size="9.5" fill="#0d1b2a" font-weight="700" ${txF}>NOW</text>`);
+  }
+  o.push('</g>');
+
+  /* axes */
+  o.push(`<line x1="${ml}" y1="${mt}" x2="${ml}" y2="${mt+ph}" stroke="#64748b" stroke-width="1.5"/>`);
+  o.push(`<line x1="${ml}" y1="${mt+ph}" x2="${ml+pw}" y2="${mt+ph}" stroke="#64748b" stroke-width="1.5"/>`);
+
+  /* X ticks — hidden when xaxis toggle is off */
+  if(vis.xaxis){
+    xTickVals(xMax).forEach(t=>{
+      const x=f(sx(t));
+      o.push(`<line x1="${x}" y1="${mt+ph}" x2="${x}" y2="${mt+ph+4}" stroke="#94a3b8" stroke-width="1"/>`);
+      o.push(`<text x="${x}" y="${mt+ph+16}" text-anchor="middle" font-size="9.5" fill="#64748b" ${txF}>${xFmt(t)}</text>`);
+    });
+    o.push(`<text x="${ml+pw/2}" y="${H-3}" text-anchor="middle" font-size="11" fill="#475569" font-weight="600" ${txF}>${xLabel}</text>`);
+  }
+
+  /* Y axis label always visible */
+  o.push(`<text x="12" y="${mt+ph/2}" text-anchor="middle" font-size="10.5" fill="#475569" font-weight="600" ${txF} transform="rotate(-90 12 ${mt+ph/2})">Latency (ms)</text>`);
+
+  /* chart title */
+  o.push(`<text x="${ml+pw/2}" y="${mt-12}" text-anchor="middle" font-size="12.5" fill="#0d1b2a" font-weight="700" ${txF}>${title}</text>`);
+
+  o.push('</svg>');
+  return o.join('');
+}
+
+function drawCharts(){
+  const iops   =gn('iops');
+  const rate   =gn('pg_rate');
+  const yrs    =Math.max(1,gn('pg_yrs')||3);
+  const bk     =get('blkkb',FS.blkkb).val;
+  const der    =get('derate',FS.derate).val;
+
+  /* current bandwidth derived from IOPS + block size */
+  const curBw  =iops!=null?(iops/1000)*bk/1000:null;  /* GB/s */
+
+  /* projected values */
+  let projIops=null,projBw=null;
+  if(iops!=null&&rate!=null&&rate>0){
+    projIops=iops*Math.pow(1+rate/100,yrs);
+    projBw  =(projIops/1000)*bk/1000;
+  }
+
+  $('chartIops').innerHTML=buildChart({
+    uid:'iops',
+    title:'IOPS vs. Estimated Latency',
+    xMax:6300000*1.18,
+    xLabel:'Total IOPS',
+    xFmt:fmtIOPS,
+    getCeil:m=>m.ceiliops,
+    currentX:iops,
+    projX:projIops,
+    projYrs:yrs,
+    deratePct:der,
+  });
+
+  $('chartBw').innerHTML=buildChart({
+    uid:'bw',
+    title:'Throughput vs. Estimated Latency',
+    xMax:86*1.18,
+    xLabel:'Throughput (GB/s)',
+    xFmt:v=>v===0?'0':v<10?v.toFixed(1):Math.round(v)+'',
+    getCeil:m=>m.ceilbw,
+    currentX:curBw,
+    projX:projBw,
+    projYrs:yrs,
+    deratePct:der,
+  });
+}
+
+/* ══════════════════════════════════════════════════
+   EXPORT — Excel (CSV download)
+   Collects all current inputs + computed results + chart
+   scaling data points for all three models and writes a
+   multi-section CSV that Excel opens directly.
+══════════════════════════════════════════════════ */
+function exportExcel(){
+  const m    = MODELS[modelKey];
+  const iops = gn('iops');
+  const rp   = getReadPct();
+  const bk   = get('blkkb',   FS.blkkb);
+  const cI   = get('ceiliops',FS.ceiliops);
+  const cD   = get('derate',  FS.derate);
+  const cBw  = get('ceilbw',  FS.ceilbw);
+  const capnow = gn('capnow');
+  const grow   = gn0('capgrow')||0;
+  const gr   = get('reduction',FS.reduction);
+  const tg   = get('target',   FS.target);
+  const mx   = get('maxpbe',   FS.maxpbe);
+  const rtt  = gn('rtt');
+  const sc   = get('streamcomp',FS.streamcomp);
+  const link = gn('linkgbps');
+  const nm   = get('nodemem', FS.nodemem);
+  const rate = gn('pg_rate');
+  const yrs  = Math.max(1,gn('pg_yrs')||3);
+  const syncLim  = get('syncrtt',  FS.syncrtt);
+  const asyncLim = get('asyncrtt', FS.asyncrtt);
+  const pf = (v,dp=2) => v==null?0:(+v);
+  const pfs = (v,dp=3) => v==null?'0':(+v).toFixed(dp);
+
+  /* ── helpers ── */
+  // CRC32 table
+  const crcTable=(()=>{const t=new Uint32Array(256);for(let i=0;i<256;i++){let c=i;for(let j=0;j<8;j++)c=c&1?(0xEDB88320^(c>>>1)):(c>>>1);t[i]=c;}return t;})();
+  function crc32(buf,init=0xFFFFFFFF){let c=init;for(let i=0;i<buf.length;i++)c=crcTable[(c^buf[i])&0xFF]^(c>>>8);return(c^0xFFFFFFFF)>>>0;}
+  function strBytes(s){return new TextEncoder().encode(s);}
+  function numToLE4(n){const b=new Uint8Array(4);new DataView(b.buffer).setUint32(0,n,true);return b;}
+  function numToLE2(n){const b=new Uint8Array(2);new DataView(b.buffer).setUint16(0,n,true);return b;}
+  function concat(...arrays){const len=arrays.reduce((s,a)=>s+a.length,0);const out=new Uint8Array(len);let off=0;for(const a of arrays){out.set(a,off);off+=a.length;}return out;}
+
+  /* ZIP entry builder (store, no compression) */
+  function zipEntry(name,data,entries){
+    const nameBytes=strBytes(name);
+    const crc=crc32(data);
+    const localHeader=concat(
+      new Uint8Array([0x50,0x4B,0x03,0x04]), // sig
+      numToLE2(20),   // version needed
+      numToLE2(0),    // flags
+      numToLE2(0),    // compression (store)
+      numToLE2(0),    // mod time
+      numToLE2(0),    // mod date
+      numToLE4(crc),
+      numToLE4(data.length),
+      numToLE4(data.length),
+      numToLE2(nameBytes.length),
+      numToLE2(0),    // extra field length
+      nameBytes
+    );
+    const offset=entries.reduce((s,e)=>s+e.local.length+e.data.length,0);
+    entries.push({name:nameBytes,local:localHeader,data,crc,offset,size:data.length});
+  }
+  function buildZip(entries){
+    const parts=[];
+    for(const e of entries){parts.push(e.local);parts.push(e.data);}
+    let cdOffset=entries.reduce((s,e)=>s+e.local.length+e.data.length,0);
+    const cdParts=[];
+    for(const e of entries){
+      const cd=concat(
+        new Uint8Array([0x50,0x4B,0x01,0x02]), // sig
+        numToLE2(20),numToLE2(20),numToLE2(0),numToLE2(0),numToLE2(0),
+        numToLE4(e.crc),numToLE4(e.size),numToLE4(e.size),
+        numToLE2(e.name.length),numToLE2(0),numToLE2(0),
+        numToLE2(0),numToLE2(0),numToLE4(0),numToLE4(e.offset),
+        e.name
+      );
+      cdParts.push(cd);
+    }
+    const cdBytes=concat(...cdParts);
+    const cdSize=cdBytes.length;
+    const eocd=concat(
+      new Uint8Array([0x50,0x4B,0x05,0x06]),
+      numToLE2(0),numToLE2(0),
+      numToLE2(entries.length),numToLE2(entries.length),
+      numToLE4(cdSize),numToLE4(cdOffset),
+      numToLE2(0)
+    );
+    return concat(...parts,cdBytes,eocd);
+  }
+
+  /* ── SpreadsheetML XML builders ── */
+  function xmlEsc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+  /* build worksheet XML from 2-D array [ [val,...], ... ]
+     numeric rows: cell type 'n'; string rows: shared strings via inline str */
+  function buildSheet(grid){
+    let xml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      +'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+      +'<sheetData>';
+    grid.forEach((row,ri)=>{
+      xml+=`<row r="${ri+1}">`;
+      row.forEach((val,ci)=>{
+        const col=String.fromCharCode(65+ci);
+        const ref=`${col}${ri+1}`;
+        if(val===''||val==null){/* empty */}
+        else if(typeof val==='number'||(!isNaN(val)&&val!=='')){
+          xml+=`<c r="${ref}"><v>${+val}</v></c>`;
+        } else {
+          xml+=`<c r="${ref}" t="inlineStr"><is><t>${xmlEsc(val)}</t></is></c>`;
+        }
+      });
+      xml+='</row>';
+    });
+    xml+='</sheetData></worksheet>';
+    return xml;
+  }
+
+  /* ── DrawingML chart XML ── */
+  /* scatter chart series builder */
+  function scatterSer(idx,name,sheetName,xCol,yCol,firstDataRow,lastDataRow,color,lineWidth,smooth){
+    const xRef=`'${sheetName}'!$${xCol}$${firstDataRow}:$${xCol}$${lastDataRow}`;
+    const yRef=`'${sheetName}'!$${yCol}$${firstDataRow}:$${yCol}$${lastDataRow}`;
+    const hexCol=color.replace('#','');
+    return `<c:ser>
+  <c:idx val="${idx}"/><c:order val="${idx}"/>
+  <c:tx><c:strRef><c:f>"${xmlEsc(name)}"</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>${xmlEsc(name)}</c:v></c:pt></c:strCache></c:strRef></c:tx>
+  <c:spPr><a:ln w="${lineWidth||25400}"><a:solidFill><a:srgbClr val="${hexCol}"/></a:solidFill></a:ln></c:spPr>
+  <c:marker><c:symbol val="none"/></c:marker>
+  <c:xVal><c:numRef><c:f>${xRef}</c:f></c:numRef></c:xVal>
+  <c:yVal><c:numRef><c:f>${yRef}</c:f></c:numRef></c:yVal>
+  <c:smooth val="${smooth==null?1:smooth}"/>
+</c:ser>`;
+  }
+
+  /* dot series (for NOW and projected markers) */
+  function dotSer(idx,name,xVal,yVal,color,markerSymbol){
+    const hexCol=color.replace('#','');
+    return `<c:ser>
+  <c:idx val="${idx}"/><c:order val="${idx}"/>
+  <c:tx><c:strRef><c:f>"${xmlEsc(name)}"</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>${xmlEsc(name)}</c:v></c:pt></c:strCache></c:strRef></c:tx>
+  <c:spPr><a:ln><a:noFill/></a:ln></c:spPr>
+  <c:marker><c:symbol val="${markerSymbol||'circle'}"/><c:size val="7"/>
+    <c:spPr><a:solidFill><a:srgbClr val="${hexCol}"/></a:solidFill><a:ln><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:ln></c:spPr>
+  </c:marker>
+  <c:xVal><c:numLit><c:ptCount val="1"/><c:pt idx="0"><c:v>${xVal}</c:v></c:pt></c:numLit></c:xVal>
+  <c:yVal><c:numLit><c:ptCount val="1"/><c:pt idx="0"><c:v>${yVal}</c:v></c:pt></c:numLit></c:yVal>
+</c:ser>`;
+  }
+
+  function buildChartXml(title,seriesXml,xAxisTitle,yAxisTitle){
+    const ns='xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" '
+            +'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
+            +'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace ${ns}>
+  <c:chart>
+    <c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/>
+      <a:p><a:r><a:rPr lang="en-US" b="1"/><a:t>${xmlEsc(title)}</a:t></a:r></a:p>
+    </c:rich></c:tx><c:overlay val="0"/></c:title>
+    <c:autoTitleDeleted val="0"/>
+    <c:plotArea>
+      <c:layout/>
+      <c:scatterChart>
+        <c:scatterStyle val="smoothMarker"/>
+        ${seriesXml}
+        <c:axId val="1"/><c:axId val="2"/>
+      </c:scatterChart>
+      <c:valAx>
+        <c:axId val="1"/><c:scaling><c:orientation val="minMax"/></c:scaling>
+        <c:delete val="0"/><c:axPos val="b"/>
+        <c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/>
+          <a:p><a:r><a:rPr lang="en-US"/><a:t>${xmlEsc(xAxisTitle)}</a:t></a:r></a:p>
+        </c:rich></c:tx><c:overlay val="0"/></c:title>
+        <c:crossAx val="2"/>
+      </c:valAx>
+      <c:valAx>
+        <c:axId val="2"/><c:scaling><c:orientation val="minMax"/></c:scaling>
+        <c:delete val="0"/><c:axPos val="l"/>
+        <c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/>
+          <a:p><a:r><a:rPr lang="en-US"/><a:t>${xmlEsc(yAxisTitle)}</a:t></a:r></a:p>
+        </c:rich></c:tx><c:overlay val="0"/></c:title>
+        <c:crossAx val="1"/>
+      </c:valAx>
+    </c:plotArea>
+    <c:legend><c:legendPos val="b"/></c:legend>
+    <c:plotVisOnly val="1"/>
+  </c:chart>
+  <c:spPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></c:spPr>
+</c:chartSpace>`;
+  }
+
+  /* drawing XML that embeds a chart into a worksheet */
+  function buildDrawingXml(chartRId,fromCol,fromRow,toCol,toRow){
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
+          xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+          xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+  <xdr:twoCellAnchor>
+    <xdr:from><xdr:col>${fromCol}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${fromRow}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>
+    <xdr:to>  <xdr:col>${toCol}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${toRow}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>
+    <xdr:graphicFrame macro="">
+      <xdr:nvGraphicFramePr>
+        <xdr:cNvPr id="2" name="Chart 1"/>
+        <xdr:cNvGraphicFramePr/>
+      </xdr:nvGraphicFramePr>
+      <xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm>
+      <a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">
+        <c:chart r:id="${chartRId}"/>
+      </a:graphicData></a:graphic>
+    </xdr:graphicFrame>
+    <xdr:clientData/>
+  </xdr:twoCellAnchor>
+</xdr:wsDr>`;
+  }
+
+  /* worksheet rels XML */
+  function buildWsRels(drawingRId,drawingTarget){
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="${drawingRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="${drawingTarget}"/>
+</Relationships>`;
+  }
+  function buildDrawingRels(chartRId,chartTarget){
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="${chartRId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="${chartTarget}"/>
+</Relationships>`;
+  }
+
+  /* ── Compute all data ── */
+  const STEPS_EXP = 60;
+  const maxIops   = 6300000;
+  const maxBw     = 86;
+
+  // Sheet 1: Summary (sizing results)
+  const summaryRows = [];
+  summaryRows.push(['IBM FlashSystem Sizing Export']);
+  summaryRows.push(['Model', `IBM ${m.name} (${m.mtm})`]);
+  summaryRows.push(['Storage Virtualize', '9.1.2']);
+  summaryRows.push(['Exported', new Date().toLocaleString()]);
+  summaryRows.push([]);
+  summaryRows.push(['=== WORKLOAD INPUTS ===']);
+  summaryRows.push(['Field','Value','Unit','Source']);
+  summaryRows.push(['Total IOPS',            iops!=null?iops:'',       'IOPS',   iops!=null?'user':'—']);
+  summaryRows.push(['Read %',                rp.val,                   '%',      rp.assumed?'assumed':'user']);
+  summaryRows.push(['Write %',               100-rp.val,               '%',      rp.assumed?'assumed':'user']);
+  summaryRows.push(['Block size',            bk.val,                   'KB',     bk.assumed?'assumed':'user']);
+  summaryRows.push(['Data today',            capnow!=null?capnow:'',   'TB',     capnow!=null?'user':'—']);
+  summaryRows.push(['Growth',                grow,                     'TB',     '']);
+  summaryRows.push(['Data reduction ratio',  gr.val,                   ':1',     gr.assumed?'assumed':'user']);
+  summaryRows.push(['Target utilisation',    tg.val,                   '%',      tg.assumed?'assumed':'user']);
+  summaryRows.push(['RTT to DR site',        rtt!=null?rtt:'',         'ms',     rtt!=null?'user':'—']);
+  summaryRows.push(['WAN link speed',        link!=null?link:'',       'Gbps',   link!=null?'user':'—']);
+  summaryRows.push(['Stream compression',    sc.val,                   ':1',     sc.assumed?'assumed':'user']);
+  summaryRows.push([]);
+  summaryRows.push(['=== RESULTS SUMMARY ===']);
+  summaryRows.push(['Card','Metric','Value','Verdict']);
+  if(iops!=null){
+    const usableIops=cI.val*(cD.val/100);
+    const totalGBs=(iops/1000)*bk.val/1000;
+    const worst=Math.max((iops/usableIops)*100,(totalGBs/cBw.val)*100);
+    summaryRows.push(['Performance','IOPS utilisation',+((iops/usableIops)*100).toFixed(1)+'%', worst<=70?'FITS':worst<=90?'MARGINAL':'OVER LIMIT']);
+    summaryRows.push(['Performance','BW utilisation',  +((totalGBs/cBw.val)*100).toFixed(1)+'%','']);
+    summaryRows.push(['Performance','Total throughput (MB/s)', +((iops/1000)*bk.val).toFixed(0),'']);
+  }
+  if(capnow!=null){
+    const totalLogTB=capnow+grow;
+    const util=((totalLogTB/(tg.val/100))/1000/mx.val)*100;
+    summaryRows.push(['Capacity','Cap utilisation', +util.toFixed(1)+'%', util<=70?'FITS':util<=90?'TIGHT':'TOO LARGE']);
+    summaryRows.push(['Capacity','Physical flash (TB)', +(totalLogTB/gr.val).toFixed(1),'']);
+  }
+  if(rtt!=null){
+    const isSync=rtt<=syncLim.val, overAsync=rtt>asyncLim.val;
+    let mode=overAsync?'NOT SUPPORTED':isSync?'PBHA SYNC':'PBR ASYNC';
+    if(!isSync&&!overAsync&&iops!=null){
+      const wm=(iops*((100-rp.val)/100)/1000)*bk.val;
+      const ow=wm/sc.val;
+      const lu=link!=null?link*125*0.80:null;
+      if(lu!=null) mode+=(ow<=lu?' / JOURNALING':' / CYCLING');
+    }
+    summaryRows.push(['Replication','Mode', mode, overAsync?'UNSUPPORTED':'OK']);
+    if(iops!=null&&link!=null){
+      const wm=(iops*((100-rp.val)/100)/1000)*bk.val;
+      const lu=link*125*0.80;
+      const lutil=(wm/sc.val)/lu*100;
+      summaryRows.push(['Replication','Link utilisation', +lutil.toFixed(1)+'%','']);
+    }
+  }
+
+  // Sheet 2: IOPS vs Latency data  (cols: A=IOPS, B=FS9600, C=FS7600, D=FS5600)
+  const iopsDataRows = [];
+  iopsDataRows.push(['IOPS (Total)','FS9600 Latency (ms)','FS7600 Latency (ms)','FS5600 Latency (ms)']);
+  for(let i=0;i<=STEPS_EXP;i++){
+    const x=(i/STEPS_EXP)*maxIops;
+    iopsDataRows.push([
+      Math.round(x),
+      +latCurve(x,CM[0].ceiliops,CM[0].baseMs).toFixed(4),
+      +latCurve(x,CM[1].ceiliops,CM[1].baseMs).toFixed(4),
+      +latCurve(x,CM[2].ceiliops,CM[2].baseMs).toFixed(4),
+    ]);
+  }
+
+  // Sheet 3: Throughput vs Latency data
+  const bwDataRows = [];
+  bwDataRows.push(['Throughput GB/s','FS9600 Latency (ms)','FS7600 Latency (ms)','FS5600 Latency (ms)']);
+  for(let i=0;i<=STEPS_EXP;i++){
+    const x=(i/STEPS_EXP)*maxBw;
+    bwDataRows.push([
+      +x.toFixed(3),
+      +latCurve(x,CM[0].ceilbw,CM[0].baseMs).toFixed(4),
+      +latCurve(x,CM[1].ceilbw,CM[1].baseMs).toFixed(4),
+      +latCurve(x,CM[2].ceilbw,CM[2].baseMs).toFixed(4),
+    ]);
+  }
+
+  // Sheet 4: Growth Projection  (always present; if no iops/rate just headers)
+  const projDataRows = [];
+  projDataRows.push(['Year','Projected IOPS','FS9600 Latency (ms)','FS7600 Latency (ms)','FS5600 Latency (ms)']);
+  if(iops!=null){
+    const rateVal = (rate!=null&&rate>0)?rate:0;
+    for(let y=0;y<=Math.max(yrs,0);y++){
+      const px=iops*Math.pow(1+rateVal/100,y);
+      projDataRows.push([
+        y===0?'Now':'Yr '+y,
+        Math.round(px),
+        +latCurve(px,CM[0].ceiliops,CM[0].baseMs).toFixed(4),
+        +latCurve(px,CM[1].ceiliops,CM[1].baseMs).toFixed(4),
+        +latCurve(px,CM[2].ceiliops,CM[2].baseMs).toFixed(4),
+      ]);
+    }
+  }
+
+  /* ── Compute NOW and projected dot values for chart markers ── */
+  const nowX_iops   = iops!=null?iops:null;
+  const projX_iops  = (iops!=null&&rate!=null&&rate>0)?iops*Math.pow(1+rate/100,yrs):null;
+  const nowX_bw     = nowX_iops!=null?(nowX_iops/1000)*bk.val/1000:null;
+  const projX_bw    = projX_iops!=null?(projX_iops/1000)*bk.val/1000:null;
+
+  /* ── IOPS chart series XML ── */
+  // data starts at row 2 (row index 1), ends at row STEPS_EXP+2
+  const DR = STEPS_EXP+2; // last data row number in sheet
+  let iopsSerXml='';
+  iopsSerXml+=scatterSer(0,'FS9600','IOPS vs Latency','A','B',2,DR,'00b4d8');
+  iopsSerXml+=scatterSer(1,'FS7600','IOPS vs Latency','A','C',2,DR,'7c3aed');
+  iopsSerXml+=scatterSer(2,'FS5600','IOPS vs Latency','A','D',2,DR,'f59e0b');
+  // NOW dots
+  if(nowX_iops!=null){
+    CM.forEach((cm2,ci)=>{
+      const ny=latCurve(Math.min(nowX_iops,cm2.ceiliops*0.9995),cm2.ceiliops,cm2.baseMs);
+      iopsSerXml+=dotSer(3+ci,`NOW (${cm2.label})`,nowX_iops,+ny.toFixed(4),cm2.color.replace('#',''),'circle');
+    });
+  }
+  // Projected dots
+  if(projX_iops!=null){
+    CM.forEach((cm2,ci)=>{
+      const py=latCurve(Math.min(projX_iops,cm2.ceiliops*0.9995),cm2.ceiliops,cm2.baseMs);
+      iopsSerXml+=dotSer(6+ci,`+${yrs}yr (${cm2.label})`,projX_iops,+py.toFixed(4),cm2.color.replace('#',''),'diamond');
+    });
+  }
+
+  /* ── BW chart series XML ── */
+  let bwSerXml='';
+  bwSerXml+=scatterSer(0,'FS9600','Throughput vs Latency','A','B',2,DR,'00b4d8');
+  bwSerXml+=scatterSer(1,'FS7600','Throughput vs Latency','A','C',2,DR,'7c3aed');
+  bwSerXml+=scatterSer(2,'FS5600','Throughput vs Latency','A','D',2,DR,'f59e0b');
+  if(nowX_bw!=null){
+    CM.forEach((cm2,ci)=>{
+      const ny=latCurve(Math.min(nowX_bw,cm2.ceilbw*0.9995),cm2.ceilbw,cm2.baseMs);
+      bwSerXml+=dotSer(3+ci,`NOW (${cm2.label})`,+nowX_bw.toFixed(3),+ny.toFixed(4),cm2.color.replace('#',''),'circle');
+    });
+  }
+  if(projX_bw!=null){
+    CM.forEach((cm2,ci)=>{
+      const py=latCurve(Math.min(projX_bw,cm2.ceilbw*0.9995),cm2.ceilbw,cm2.baseMs);
+      bwSerXml+=dotSer(6+ci,`+${yrs}yr (${cm2.label})`,+projX_bw.toFixed(3),+py.toFixed(4),cm2.color.replace('#',''),'diamond');
+    });
+  }
+
+  /* ── Growth chart series (bar-style scatter: projected IOPS per model) ── */
+  const projDR=projDataRows.length;
+  let projSerXml='';
+  if(projDataRows.length>1){
+    projSerXml+=scatterSer(0,'FS9600','Growth Projection','B','C',2,projDR,'00b4d8',undefined,0);
+    projSerXml+=scatterSer(1,'FS7600','Growth Projection','B','D',2,projDR,'7c3aed',undefined,0);
+    projSerXml+=scatterSer(2,'FS5600','Growth Projection','B','E',2,projDR,'f59e0b',undefined,0);
+  }
+
+  /* ── Worksheet XML with drawing reference ── */
+  function buildSheetWithDrawing(grid, drawingRId){
+    let xml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      +'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
+      +' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+      +'<sheetData>';
+    grid.forEach((row,ri)=>{
+      xml+=`<row r="${ri+1}">`;
+      row.forEach((val,ci)=>{
+        if(ci>25) return; // max col Z
+        const col=String.fromCharCode(65+ci);
+        const ref=`${col}${ri+1}`;
+        if(val===''||val==null){/* skip */}
+        else if(typeof val==='number'){
+          xml+=`<c r="${ref}"><v>${val}</v></c>`;
+        } else {
+          xml+=`<c r="${ref}" t="inlineStr"><is><t>${xmlEsc(val)}</t></is></c>`;
+        }
+      });
+      xml+='</row>';
+    });
+    xml+='</sheetData>';
+    if(drawingRId) xml+=`<drawing r:id="${drawingRId}"/>`;
+    xml+='</worksheet>';
+    return xml;
+  }
+
+  /* ── Assemble all files ── */
+  const entries=[];
+
+  const addXml=(path,xml)=>zipEntry(path,strBytes(xml),entries);
+
+  // [Content_Types].xml
+  addXml('[Content_Types].xml',
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml"  ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/worksheets/sheet3.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/worksheets/sheet4.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/charts/chart1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>
+  <Override PartName="/xl/charts/chart2.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>
+  <Override PartName="/xl/charts/chart3.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>
+  <Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>
+  <Override PartName="/xl/drawings/drawing2.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>
+  <Override PartName="/xl/drawings/drawing3.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>
+</Types>`);
+
+  // _rels/.rels
+  addXml('_rels/.rels',
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`);
+
+  // xl/workbook.xml
+  addXml('xl/workbook.xml',
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="Summary" sheetId="1" r:id="rId1"/>
+    <sheet name="IOPS vs Latency" sheetId="2" r:id="rId2"/>
+    <sheet name="Throughput vs Latency" sheetId="3" r:id="rId3"/>
+    <sheet name="Growth Projection" sheetId="4" r:id="rId4"/>
+  </sheets>
+</workbook>`);
+
+  // xl/_rels/workbook.xml.rels
+  addXml('xl/_rels/workbook.xml.rels',
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet3.xml"/>
+  <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet4.xml"/>
+</Relationships>`);
+
+  // Sheet 1: Summary (no chart)
+  addXml('xl/worksheets/sheet1.xml', buildSheetWithDrawing(summaryRows, null));
+
+  // Sheet 2: IOPS vs Latency  + chart1
+  addXml('xl/worksheets/sheet2.xml', buildSheetWithDrawing(iopsDataRows, 'rId1'));
+  addXml('xl/worksheets/_rels/sheet2.xml.rels', buildWsRels('rId1','../drawings/drawing1.xml'));
+  addXml('xl/drawings/drawing1.xml', buildDrawingXml('rId1',0,1,10,30));
+  addXml('xl/drawings/_rels/drawing1.xml.rels', buildDrawingRels('rId1','../charts/chart1.xml'));
+  addXml('xl/charts/chart1.xml',
+    buildChartXml(`IOPS vs Estimated Latency — IBM ${m.name}`,iopsSerXml,'Total IOPS','Latency (ms)'));
+
+  // Sheet 3: Throughput vs Latency  + chart2
+  addXml('xl/worksheets/sheet3.xml', buildSheetWithDrawing(bwDataRows, 'rId1'));
+  addXml('xl/worksheets/_rels/sheet3.xml.rels', buildWsRels('rId1','../drawings/drawing2.xml'));
+  addXml('xl/drawings/drawing2.xml', buildDrawingXml('rId1',0,1,10,30));
+  addXml('xl/drawings/_rels/drawing2.xml.rels', buildDrawingRels('rId1','../charts/chart2.xml'));
+  addXml('xl/charts/chart2.xml',
+    buildChartXml(`Throughput vs Estimated Latency — IBM ${m.name}`,bwSerXml,'Throughput (GB/s)','Latency (ms)'));
+
+  // Sheet 4: Growth Projection  + chart3 (if data exists)
+  addXml('xl/worksheets/sheet4.xml', buildSheetWithDrawing(projDataRows, projDataRows.length>1?'rId1':null));
+  if(projDataRows.length>1){
+    addXml('xl/worksheets/_rels/sheet4.xml.rels', buildWsRels('rId1','../drawings/drawing3.xml'));
+    addXml('xl/drawings/drawing3.xml', buildDrawingXml('rId1',0,projDataRows.length+2,9,projDataRows.length+22));
+    addXml('xl/drawings/_rels/drawing3.xml.rels', buildDrawingRels('rId1','../charts/chart3.xml'));
+    addXml('xl/charts/chart3.xml',
+      buildChartXml(`IOPS Growth Projection — IBM ${m.name}`,projSerXml,'Projected IOPS','Latency (ms)'));
+  }
+
+  /* ── download ── */
+  const zipBytes = buildZip(entries);
+  const blob = new Blob([zipBytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href=url;
+  const modelLabel = m.name.replace(/\s+/g,'-');
+  a.download=`FlashSystem-Sizing-${modelLabel}-${new Date().toISOString().slice(0,10)}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ══════════════════════════════════════════════════
+   EXPORT — Proposal PDF (browser print)
+   Populates the hidden print-header element with a
+   summary of key figures, then triggers window.print().
+   The @media print CSS rules handle layout/visibility.
+══════════════════════════════════════════════════ */
+function exportPdf(){
+  const m   = MODELS[modelKey];
+  const iops= gn('iops');
+  const rp  = getReadPct();
+  const bk  = get('blkkb',FS.blkkb);
+  const cI  = get('ceiliops',FS.ceiliops);
+  const cD  = get('derate',  FS.derate);
+  const cBw = get('ceilbw',  FS.ceilbw);
+  const capnow= gn('capnow');
+  const grow  = gn0('capgrow')||0;
+  const gr  = get('reduction',FS.reduction);
+  const tg  = get('target',  FS.target);
+  const mx  = get('maxpbe',  FS.maxpbe);
+  const rtt = gn('rtt');
+  const sc  = get('streamcomp',FS.streamcomp);
+  const link= gn('linkgbps');
+  const nm  = get('nodemem',FS.nodemem);
+  const syncLim = get('syncrtt',FS.syncrtt);
+  const asyncLim= get('asyncrtt',FS.asyncrtt);
+
+  /* build summary KV pairs for the print header */
+  const kv = (k,v) =>
+    `<div class="pph-kv"><span class="pph-k">${k}</span><span class="pph-v">${v}</span></div>`;
+
+  let perf='—', cap='—', repl='—', mem='—';
+
+  if(iops!=null){
+    const wpct=100-rp.val;
+    const totalGBs=(iops/1000)*bk.val/1000;
+    const usableIops=cI.val*(cD.val/100);
+    const worst=Math.max((iops/usableIops)*100,(totalGBs/cBw.val)*100);
+    perf = worst<=70?'✔ FITS':worst<=90?'⚠ MARGINAL':'✘ OVER LIMIT';
+  }
+  if(capnow!=null){
+    const totalLogTB=capnow+grow;
+    const util=((totalLogTB/(tg.val/100))/1000/mx.val)*100;
+    cap = util<=70?'✔ FITS':util<=90?'⚠ TIGHT':'✘ TOO LARGE';
+  }
+  if(rtt!=null){
+    const isSync=rtt<=syncLim.val, overAsync=rtt>asyncLim.val;
+    if(overAsync) repl='✘ RTT TOO HIGH';
+    else {
+      let writeMBs2=null,onWire=null,linkUse=null;
+      if(iops!=null){
+        writeMBs2=(iops*((100-rp.val)/100)/1000)*bk.val;
+        onWire=writeMBs2/sc.val;
+      }
+      const linkU=link!=null?link*125*0.80:null;
+      linkUse=(onWire!=null&&linkU!=null)?(onWire/linkU)*100:null;
+      if(isSync) repl='✔ PBHA SYNC (RPO=0)';
+      else if(linkUse!=null) repl=linkUse<=70?'✔ PBR ASYNC / JOURNALING':linkUse<=90?'⚠ PBR ASYNC / MARGINAL':'✘ PBR ASYNC / CYCLING';
+      else repl='PBR ASYNC';
+    }
+  }
+  if(iops!=null||rtt!=null){
+    const usable=nm.val*0.80;
+    const wc=usable*0.15;
+    let buf=0;
+    if(rtt!=null&&rtt<=syncLim.val&&iops!=null){
+      const wm=(iops*((100-rp.val)/100)/1000)*bk.val;
+      buf=wm*(rtt/1000)*2/1000;
+    }
+    const mu=((wc+buf)/usable)*100;
+    mem=mu<=70?'✔ OK':mu<=90?'⚠ REVIEW':'✘ TIGHT';
+  }
+
+  const hdrEl = $('printHeader');
+  hdrEl.innerHTML=`
+    <h2>IBM FlashSystem Sizing Proposal</h2>
+    <div class="pph-sub">IBM ${m.name} (${m.mtm}) · Storage Virtualize 9.1.2 · Generated ${new Date().toLocaleDateString()}</div>
+    <div class="pph-meta">
+      ${kv('Performance', perf)}
+      ${kv('Capacity',    cap)}
+      ${kv('Replication', repl)}
+      ${kv('Memory',      mem)}
+      ${iops!=null?kv('IOPS input', iops.toLocaleString('en-US')):''}
+      ${capnow!=null?kv('Data (TB)', (capnow+grow).toLocaleString('en-US')):''}
+      ${rtt!=null?kv('RTT (ms)', rtt):''}
+      ${kv('Model', m.name)}
+    </div>
+    <div style="margin-top:10px;font-size:10.5px;color:#94b3cc">
+      Pre-sales sizing estimate. Confirm with IBM Configurator and Storage Virtualize 9.1.2 configuration limits before quoting BOM.
+    </div>`;
+
+  /* ensure the perf charts section is open so it prints */
+  const perfSec = $('perfSection');
+  const wasOpen = perfSec.open;
+  perfSec.open = true;
+
+  window.print();
+
+  /* restore state after print dialog is dismissed */
+  setTimeout(()=>{ perfSec.open=wasOpen; },500);
+}
+
+/* ══ re-run all ══ */
+function recalc(){ calcPerf(); calcCap(); calcRepl(); calcMem(); drawCharts(); }
+
+/* ══ apply selected model: refresh ceilings, advanced hints, footer ══ */
+function applyModel(key){
+  if(!MODELS[key]) key='fs9600';
+  modelKey=key;
+  const m=MODELS[key];
+  FS=Object.assign({}, SHARED, m);
+  const n=v=>v.toLocaleString('en-US');
+  $('ceiliops').placeholder=String(m.ceiliops); $('defIops').textContent=n(m.ceiliops);
+  $('ceilbw').placeholder  =String(m.ceilbw);   $('defBw').textContent  =m.ceilbw+' GB/s';
+  $('maxpbe').placeholder  =String(m.maxpbe);   $('defPbe').textContent =m.maxpbe+' PBe';
+  $('nodemem').placeholder =String(m.nodemem);  $('defMem').textContent =n(m.nodemem)+' GB';
+  $('footModel').textContent=
+    `IBM ${m.name} (${m.mtm}) · Storage Virtualize 9.1.2 · Single enclosure: `+
+    `${n(m.ceiliops)} IOPS (4K read-hit) · ${m.ceilbw} GB/s · ${m.maxpbe} PBe · grid up to ${m.gridpbe} PBe`;
+  recalc();
+}
+$('model').addEventListener('change',e=>applyModel(e.target.value));
+
+/* ══ wire R/W % linked pair ══ */
+$('readpct').addEventListener('input',()=>{ syncRW('read');  recalc(); });
+$('writepct').addEventListener('input',()=>{ syncRW('write'); recalc(); });
+
+/* ══ wire all other inputs ══ */
+['iops','blkkb','capnow','capgrow','reduction','target',
+ 'rtt','linkgbps','streamcomp','ceiliops','derate','ceilbw','maxpbe','syncrtt','asyncrtt','nodemem']
+  .forEach(id=>$(id).addEventListener('input',recalc));
+
+/* ══ wire perf chart growth inputs ══ */
+['pg_rate','pg_yrs'].forEach(id=>$(id).addEventListener('input',drawCharts));
+
+/* ══ wire visibility checkboxes ══ */
+(function(){
+  const toggles=[
+    {chk:'chk_fs9600', vis_key:'fs9600', lbl:'cvis_fs9600'},
+    {chk:'chk_fs7600', vis_key:'fs7600', lbl:'cvis_fs7600'},
+    {chk:'chk_fs5600', vis_key:'fs5600', lbl:'cvis_fs5600'},
+    {chk:'chk_xaxis',  vis_key:'xaxis',  lbl:'cvis_xaxis'},
+    {chk:'chk_now',    vis_key:'now',     lbl:'cvis_now'},
+    {chk:'chk_proj',   vis_key:'proj',    lbl:'cvis_proj'},
+  ];
+  toggles.forEach(({chk,vis_key,lbl})=>{
+    const el=$(chk);
+    if(!el) return;
+    el.addEventListener('change',function(){
+      vis[vis_key]=this.checked;
+      const wrap=$(lbl);
+      if(wrap) wrap.classList.toggle('dimmed',!this.checked);
+      drawCharts();
+    });
+  });
+})();
+
+/* ══ export buttons ══ */
+$('btnExcelExport').addEventListener('click', exportExcel);
+$('btnPdfExport').addEventListener('click',   exportPdf);
+
+/* ══ sample ══ */
+$('btnSample').addEventListener('click',()=>{
+  Object.entries(SAMPLE).forEach(([id,v])=>{const el=$(id);if(el)el.value=v;});
+  // sync the write field from the sample readpct
+  syncRW('read');
+  recalc();
+});
+
+/* ══ clear ══ */
+$('btnClear').addEventListener('click',()=>{
+  ['iops','readpct','writepct','blkkb','capnow','capgrow','reduction','target',
+   'rtt','linkgbps','streamcomp','ceiliops','derate','ceilbw','maxpbe','syncrtt','asyncrtt','nodemem',
+   'pg_rate','pg_yrs']
+    .forEach(id=>{
+      const el=$(id);
+      if(el){ el.value=''; el.classList.remove('linked'); }
+    });
+  rwLastEdited=null;
+  recalc();
+});
+
+/* ══ init ══ */
+applyModel($('model').value);
+
+})();
+</script>
+</body>
+</html>
