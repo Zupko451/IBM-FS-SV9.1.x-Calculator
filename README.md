@@ -1,10 +1,9 @@
-# IBM-FS-SV9.1.x-Calculator
-This calculator gives a quick, defensible first-pass answers to all four of the current-generation **IBM FlashSystem** arrays — **FS9600**, **FS7600**, **FS5600**, and **SV3Nodes** — running **Storage Virtualize 9.1.2**.
-
 # IBM FlashSystem — Storage Virtualize 9.1.2 Sizing Calculator
-## Technical README & Plain-Language Guide
+## Technical README & Plain-Language Guide — **v5**
 
 *What every number means, what the results are telling you, and how to use them to explain a storage design — written so that someone new to storage sizing can follow it.*
+
+> **What changed in v5 (read this if you used an earlier build).** The performance engine was recalibrated against **IBM Storage Modeller** output. Three things moved materially: (1) the latency curve is now a textbook queueing model instead of an ad-hoc curve; (2) the IOPS "fit" is measured against a realistic **mixed-workload saturation point** rather than a flat derate of the datasheet peak — which lowered the usable-IOPS ceiling roughly 3–4× and made it match IBM's tooling; and (3) throughput now sizes **reads and writes separately** by transfer size. Because these change the output numbers, **v5 exports should not be mixed with earlier ones.** Full detail in Section 7.
 
 ---
 
@@ -17,27 +16,36 @@ When you buy or design an enterprise storage array, you have to answer four prac
 3. **If the site burns down, how do we get a copy somewhere else, and how fresh will that copy be?** (replication / disaster recovery)
 4. **Does the array have enough memory to do all of the above well?** (cache & buffers)
 
-This calculator gives a quick, defensible first-pass answer to all four for the current-generation **IBM FlashSystem** arrays — **FS9600**, **FS7600**, and **FS5600** — running **Storage Virtualize 9.1.2**. You pick the model at the top of the panel and the tool measures your workload against that array's ceilings. Below the four result cards, a **Performance Scaling Charts** section overlays all three models on the same graph so you can instantly see which model gives the right amount of headroom and where growth eventually forces an upgrade or a FlashSystem Grid. This tool is a *pre-sales / planning* tool: it produces estimates good enough to shape a design and explain it, not the final bill of materials. The final configuration is always confirmed in the official IBM Configurator.
+This calculator gives a quick, defensible first-pass answer to all four for the current-generation **IBM FlashSystem** arrays — **FS9600**, **FS7600**, and **FS5600** — running **Storage Virtualize 9.1.2**. You pick the model at the top of the panel and the tool measures your workload against that array's ceilings. Below the four result cards, a **Performance Scaling Charts** section overlays all three models on the same graph so you can instantly see which model gives the right amount of headroom and where growth eventually forces an upgrade or a FlashSystem Grid.
+
+### This is a teaching-and-estimation tool, not a substitute for Storage Modeller
+
+A banner at the top of the tool states this plainly, and it matters: **this calculator shows the formulas behind the numbers so you can explain *how you got there*.** It is directional and not court-defensible. IBM Storage Modeller (and Storage Insights, for measured telemetry) remain the authoritative sources — Storage Modeller produces the report, the graph, and the number you commit to; this tool complements it by making the arithmetic visible in a client conversation. The two are designed to agree: for the calibrated reference workload, the calculator's FS9600 results now land within a few percent of Storage Modeller (see Section 7). Always confirm the final configuration in the official IBM Configurator and the current *Configuration limits* documentation before quoting a bill of materials.
 
 ### The "enter what you know" philosophy
 
 You are not expected to know every input. You type in the few things you do know (for example, "we do about 150,000 IOPS and have 200 TB of data"), and the tool fills in everything else with sensible **defaults**. Any value the tool assumed for you is tagged in **purple** with the word *assumed*. That tag is important: it tells the reader of your sizing exactly which numbers came from the customer and which were industry-standard guesses. When you can replace an assumed value with a real measured one, your sizing becomes more trustworthy.
 
-### The traffic-light / MALI FLAG  system
+### The traffic-light system
 
 Every result card shows a colored verdict so you can read it at a glance:
 
-| Color | Meaning | Utilisation band |
-|-------|---------|------------------|
-| 🟢 **Green** | Comfortably within spec. The array has headroom. | 0–70% |
-| 🟡 **Yellow** | Marginal. It works, but there's little room for spikes or growth. Review it. | 70–90% |
-| 🔴 **Red** | Over the limit. The design needs a bigger or additional array. | 90%+ |
+| Color | Meaning |
+|-------|---------|
+| 🟢 **Green** | Comfortably within spec. The array has headroom. |
+| 🟡 **Yellow / Amber** | Marginal. It works, but there's little room for spikes or growth. Review it. |
+| 🔴 **Red** | Over the limit. The design needs a bigger or additional array. |
 
-"Utilisation" simply means *how much of the array's maximum you are planning to use*. Lower is safer; you generally want to land in green so that a busy Monday morning, or next year's data growth, doesn't push you over the edge.
+"Utilisation" simply means *how much of the array's maximum you are planning to use*. Lower is safer; you generally want to land in green.
+
+**The bands differ by card, on purpose:**
+
+- The **Performance card** now uses **IBM Storage Modeller's own core thresholds**: green up to **60%** (IBM's amber line), amber **60–80%** (IBM's red line), red above **80%**. This is deliberately conservative and lets you cross-check a verdict directly against a Storage Modeller run.
+- The **Capacity, Replication, and Memory cards** use the general **70% / 90%** bands (green ≤ 70%, amber 70–90%, red > 90%).
 
 ### Choosing your model
 
-At the top of the input panel is a **FlashSystem model** selector covering the three current-generation arrays. Picking a model loads that array's performance, bandwidth, capacity, and memory ceilings, so every result is measured against the right hardware. The three are, from largest to smallest: **FS9600** (the flagship), **FS7600** (mid-to-upper enterprise), and **FS5600** (entry-to-midrange). The exact ceilings are listed in Section 7.3. The replication behaviour (sync/async RTT limits) and the mixed-workload derate are Storage Virtualize software characteristics and are the same on all three. If you're sizing a multi-array **FlashSystem grid**, override the capacity ceiling with the grid figure shown for that model.
+At the top of the input panel is a **FlashSystem model** selector covering the three current-generation arrays: **FS9600** (the flagship), **FS7600** (mid-to-upper enterprise), and **FS5600** (entry-to-midrange). Picking a model loads that array's performance, bandwidth, capacity, and memory ceilings — and, in v5, its calibrated **saturation point** and **base latency** — so every result and every chart zone is measured against the right hardware. The exact ceilings are in Section 7.3. The replication behaviour (sync/async RTT limits) and the mixed-workload model are Storage Virtualize software characteristics shared across all three (and shared with SVC SV3 nodes, which run the same software). If you're sizing a multi-array **FlashSystem Grid**, override the capacity ceiling with the grid figure shown for that model.
 
 ---
 
@@ -45,93 +53,105 @@ At the top of the input panel is a **FlashSystem model** selector covering the t
 
 **IOPS** — *Input/Output Operations Per Second.* The number of individual read or write requests the array handles each second. Think of it as "how many small errands per second." Databases and virtual machines generate lots of small errands, so they care about IOPS.
 
-**Block size** — How big each errand is, in kilobytes (KB). A bigger block moves more data per errand. Typical mixed/database workloads use about **8 KB**.
+**Transfer size / block size** — How big each errand is, in kibibytes (KiB). A bigger block moves more data per errand. Typical mixed/database reads are about **8 KiB**; **writes are often larger** (16 KiB is common), which is why v5 lets you size reads and writes separately.
 
-**Throughput / Bandwidth** — How much *total data* moves per second, measured in **MB/s** (megabytes/sec) or **GB/s** (gigabytes/sec). This is just `IOPS × block size`. Two systems can do the same IOPS but very different bandwidth if their block sizes differ. Backups and analytics care about bandwidth more than IOPS.
+**Throughput / Bandwidth** — How much *total data* moves per second, in **MB/s** or **GB/s**. In v5 it's computed per operation type: `read IOPS × read size + write IOPS × write size`. Two systems can do the same IOPS but very different bandwidth if their block sizes differ. Backups and analytics care about bandwidth more than IOPS.
 
 **Read/Write split** — What fraction of the errands are reads versus writes. A common default is **70% read / 30% write**. This matters because writes are heavier work for flash, and because **only writes need to be replicated** to a disaster-recovery site (reading data doesn't change it).
 
-**Latency / RTT** — *Round-Trip Time.* How long, in milliseconds (ms), a signal takes to travel to the other site and back. Distance adds latency because light and electricity are not instant. RTT is the single most important number deciding *which kind* of replication you can use. On the performance charts, **latency (ms/op)** refers to per-I/O response time — how long the application waits for the array to complete a single read or write — which rises as the array approaches its ceiling.
+**Latency / response time** — How long, in milliseconds (ms), the application waits for the array to complete a single read or write. It rises as the array approaches its ceiling — slowly at first, then very steeply (the "hockey stick," below).
 
-**Data reduction (DRR)** — IBM FlashSystem squeezes data with **compression** and **deduplication** before storing it. A **3:1** ratio means 3 TB of your data fits in 1 TB of physical flash. Higher ratios mean you buy less hardware for the same data.
+**RTT** — *Round-Trip Time.* How long a signal takes to travel to the DR site and back. Distance adds RTT because signals aren't instant. RTT is the single most important number deciding *which kind* of replication you can use.
 
-**Capacity flavors** — this trips up newcomers, so:
-- **Raw / usable capacity** = the actual physical flash you bought (after RAID overhead). Measured in **PBr** (petabytes raw) in this tool.
-- **Effective capacity** = how much *logical* data you can actually store *after* data reduction does its job. Measured in **PBe** (petabytes effective). This is the bigger, "marketing" number, and it's what you usually size against because it's what the customer's data actually consumes.
+**Saturation point (v5)** — the workload level at which the array's controller core effectively hits 100% for a **typical mixed workload** — i.e. where latency runs away. This is the honest ceiling for real workloads, and it's *much* lower than the datasheet "peak IOPS" figure (which is a best-case 4K-read-hit lab number). The calculator's FS9600 saturation point is calibrated directly to IBM Storage Modeller.
 
-**Headroom / target utilisation** — You never fill a storage array to 100%; performance degrades and you have no buffer. A **target of 80%** means "plan to use at most 80% of the array," leaving 20% breathing room.
+**Comfort target** — the percentage of the saturation point you're willing to plan up to (default **60%**, matching IBM's amber line). Comfortable ceiling = `saturation × comfort%`.
 
-**RPO** — *Recovery Point Objective.* If disaster strikes, how much recent data can you afford to lose? **RPO = 0** means "no data loss at all." **RPO = seconds** means "we might lose the last few seconds of writes."
+**Data reduction (DRR)** — FlashSystem squeezes data with **compression** and **deduplication** before storing it. A **3:1** ratio means 3 TB of your data fits in 1 TB of physical flash.
 
-**RTO** — *Recovery Time Objective.* How fast must you be back up and running after a failure?
+**Capacity flavors:**
+- **Raw / usable capacity** = the actual physical flash you bought (after RAID overhead), in **PBr** (petabytes raw).
+- **Effective capacity** = how much *logical* data you can store *after* data reduction, in **PBe** (petabytes effective). This is what you usually size against, because it's what the customer's data actually consumes.
 
-**Cache** — Fast memory (DRAM) inside the array that holds hot data so the system doesn't always have to go to flash. Split into **read cache** and **write cache**.
+**Headroom / target utilisation** — You never fill an array to 100%. A **capacity target of 80%** means "plan to use at most 80% of the array."
 
-**Queueing / hockey-stick curve** — As any system (storage, network, checkout line) approaches its maximum capacity, response time rises slowly at first and then very steeply. This is a fundamental property of queueing systems. The Performance Scaling Charts visualise this effect, showing why an array running at 90% utilisation has dramatically worse latency than one at 60%, even though the difference in load looks small in percentage terms.
+**RPO** — *Recovery Point Objective.* How much recent data you can afford to lose. **RPO = 0** means no loss; **RPO = seconds** means you might lose the last few seconds of writes.
 
-**FlashSystem Grid** — IBM's scale-out architecture allowing up to 32 FlashSystem nodes to be clustered together, multiplying effective capacity (and, to a degree, performance) while appearing as a single system to hosts. The charts show where a single array saturates and label that region "GRID →" to indicate where a Grid configuration would take over.
+**RTO** — *Recovery Time Objective.* How fast you must be back up after a failure.
+
+**Cache** — Fast memory (DRAM) inside the array holding hot data. Split into read cache and write cache.
+
+**Cache hit rate** — the fraction of I/O served from cache instead of flash. It is **emergent, not calculable from workload specs alone** — it depends on working-set size, locality, and time-of-day, and can only be *measured* (e.g. with Storage Insights). v5 exposes optional cache-efficiency fields as a **sensitivity** lever, not a prediction (Section 4, Card 1).
+
+**Queueing / hockey-stick curve** — As any system nears its maximum, response time rises slowly, then steeply. The latency formula (`service time ÷ (1 − utilisation)`) is the textbook expression of this and is why you plan to a comfort target well below saturation.
+
+**FlashSystem Grid** — IBM's scale-out architecture clustering up to 32 FlashSystem nodes into one system, multiplying effective capacity (and, to a degree, performance). The charts label the region past a single array's ceiling "GRID →".
 
 ---
 
 ## 3. The replication concepts, explained simply
 
-This is the part most people find confusing, so here it is in everyday terms. IBM gives you two related ways to keep a second copy of your data at another site.
+IBM gives you two related ways to keep a second copy of your data at another site.
 
-**Policy-Based HA (PBHA) — the "two arms always in sync" option.**
-Both sites are live at the same time and every write is mirrored to the other site *before the application is told "done."* Nothing is ever lost (**RPO = 0**) and failover is automatic and instant (**RTO = 0**). The catch: because the application waits for the far site to confirm every single write, the two sites must be **very close together with very low latency** — ideally well under a millisecond of round-trip time, i.e. metro-area distance. This is **synchronous** replication.
+**Policy-Based HA (PBHA) — the "two arms always in sync" option.** Both sites are live and every write is mirrored to the other site *before the application is told "done."* Nothing is lost (**RPO = 0**) and failover is automatic (**RTO = 0**). The catch: the application waits for the far site on every write, so the sites must be **very close, with very low RTT** — sub-millisecond ideal, metro distance. This is **synchronous** replication.
 
-**Policy-Based Replication (PBR) — the "shipping copies behind the scenes" option.**
-Writes are confirmed locally and a copy is sent to the far site shortly afterward. The far site is a few seconds (or more) behind, so **RPO is greater than zero** but you can put the two sites much farther apart. This is **asynchronous** replication, and IBM supports it up to about **80 ms** of round-trip time.
+**Policy-Based Replication (PBR) — the "shipping copies behind the scenes" option.** Writes are confirmed locally and copied to the far site shortly after, so **RPO > 0** but the sites can be much farther apart. This is **asynchronous** replication, supported up to about **80 ms** RTT.
 
 Within async PBR there are two automatic sub-modes:
 
-- **Journaling mode** — the link is fast enough to keep up with the rate of change, so changes stream across continuously and the copy stays only seconds behind. Good. (RPO ≈ seconds.)
-- **Cycling mode** — the link *can't* keep up, so the system falls back to sending periodic snapshots instead. The copy is further behind (larger RPO). This is a sign you need a faster link or a lower change rate.
+- **Journaling** — the link keeps up with the change rate; the copy stays only seconds behind (RPO ≈ seconds). Good.
+- **Cycling** — the link *can't* keep up, so the system falls back to periodic snapshots; the copy is further behind (larger RPO). A sign you need a faster link or lower change rate.
 
-You don't choose journaling vs cycling manually — the system picks based on whether your link can carry your write rate. The calculator predicts which one you'll land in.
+You don't choose journaling vs cycling — the system picks based on whether your link can carry your write rate. The calculator predicts which one you'll land in.
 
-**One crucial sizing insight:** ongoing replication bandwidth is driven by your **write rate**, *not* by how much total data you have. A 500 TB system that only changes 50 MB/s of data needs only enough link to carry 50 MB/s. (The exception is the very first **initial sync**, which must copy the *entire* dataset once — plan extra time or bandwidth for that one-time event; this tool sizes the steady-state, not the initial seed.)
+**One crucial sizing insight:** ongoing replication bandwidth is driven by your **write rate**, not by how much total data you have. A 500 TB system that changes 50 MB/s of data needs only enough link to carry 50 MB/s. (The exception is the one-time **initial sync**, which copies the whole dataset once — plan extra time or bandwidth for that; this tool sizes steady-state, not the seed.)
 
 ---
 
 ## 4. Walk-through of each result card
 
-Below, each card is explained as: **the question it answers → the inputs it uses → what each output number means → how to read the verdict.** The worked numbers use the built-in **Load Sample** scenario on the default **FS9600** model (150,000 IOPS, 70/30 read/write, 8 KB blocks, 200 TB data + 50 TB growth, 3.5:1 reduction, 80% target, 12 ms RTT, 10 Gbps link, 2:1 stream compression). Selecting FS7600 or FS5600 keeps the same workload but measures it against that model's smaller ceilings, so the utilisation percentages rise accordingly.
+Each card is explained as: **the question it answers → the inputs it uses → what each output means → how to read the verdict.** The worked numbers use the built-in **Load Sample** scenario on the default **FS9600**: 150,000 IOPS, 70/30 read/write, **8 KiB reads / 16 KiB writes**, 200 TB data + 50 TB growth, 3.5:1 reduction, 80% capacity target, 12 ms RTT, 10 Gbps link, 2:1 stream compression.
 
 ---
 
 ### Card 1 — Local Performance: *"Can the system handle this workload?"*
 
-**Needs:** Total IOPS. **Assumes if blank:** read/write split, block size, and the array's speed ceilings.
+**Needs:** Total IOPS. **Assumes if blank:** read/write split, block sizes, and the array's speed ceilings.
 
-**IOPS breakdown.** The tool splits your total IOPS into reads and writes using the read% you gave (or the 70% default).
+**IOPS breakdown.**
 - Read IOPS = `Total IOPS × read%` → 150,000 × 70% = **105,000**
 - Write IOPS = `Total IOPS × write%` → 150,000 × 30% = **45,000**
 
-*Why it matters:* the write portion is what later drives both replication bandwidth and write-cache needs.
+The write portion is what later drives replication bandwidth and write-cache needs.
 
-**Throughput.** Converts errands-per-second into data-per-second:
-> `(IOPS ÷ 1000) × block size in KB = MB/s`
+**Throughput (v5: transfer-size aware).** v5 sizes reads and writes separately, using each block size, and computes the true byte rate (binary KiB) displayed as decimal MB/s:
+> `(read IOPS × read KiB + write IOPS × write KiB) × 1024 ÷ 1,000,000 = MB/s`
 
-→ (150,000 ÷ 1000) × 8 = **1,200 MB/s = 1.2 GB/s**. (For reference, 1,200 MB/s is about 9.6 Gbps of data movement.)
+For the sample:
+- Read throughput = 105,000 × 8 KiB → **860 MB/s**
+- Write throughput = 45,000 × 16 KiB → **737 MB/s**
+- **Total throughput = 1,597 MB/s = 1.6 GB/s** (which is **1,523 MiB/s**, shown in parentheses so you can cross-check against Storage Modeller, which reports MiB/s)
 
-This card shows total, read, and write throughput separately so you can see whether your workload is "lots of tiny errands" (IOPS-bound) or "fewer big errands" (bandwidth-bound).
+This is a genuine v5 correction: the old build applied one flat 8 KB block to everything and reported 1,200 MB/s. Sizing the 16 KiB writes separately raises the honest figure to 1,597 MB/s — matching Storage Modeller's byte rate exactly.
 
-**System headroom.** This is the actual fit check. The array has two independent speed limits, and your workload must fit under **both**:
+**System headroom (v5: saturation-based).** The array has two independent speed limits, and your workload must fit under **both**:
 
-- **IOPS ceiling.** The array's peak IOPS figure is a *best-case* "4K read-hit" lab number. Real mixed workloads can't reach it, so the tool multiplies by a **derate** (default 60%) to get a realistic usable ceiling.
-  > Usable IOPS = `peak IOPS × derate%`
-  Then **IOPS utilisation** = `your IOPS ÷ usable IOPS`. Lower is better.
+- **Mixed-workload saturation.** Instead of derating a best-case peak, v5 measures against the IOPS level where the controller core saturates for a real mixed workload. For FS9600 this is **1,500,000 IOPS** (calibrated to Storage Modeller). The datasheet "4K read-hit peak" (6,300,000) is still shown, labelled as such, purely as a theoretical-max reference.
+  - **Comfortable ceiling** = `saturation × comfort%` → 1,500,000 × 60% = **900,000 IOPS**
+  - **Core utilisation** = `your IOPS ÷ saturation` → 150,000 ÷ 1,500,000 = **10.0%**. This figure is designed to line up with Storage Modeller's **"System Core %"** — you can read it straight across.
+  - **Estimated latency at this load** = `base service time ÷ (1 − utilisation)` → 0.113 ÷ (1 − 0.10) = **0.13 ms** (Storage Modeller's exact figure for this point is 0.126 ms).
 
-- **Bandwidth ceiling.** The most data-per-second the array can push. **Bandwidth utilisation** = `your GB/s ÷ ceiling GB/s`.
+- **Bandwidth ceiling.** The most data-per-second the array can push. **Bandwidth utilisation** = `your GB/s ÷ ceiling GB/s` → 1.6 ÷ 86 = **1.9%**.
 
-The card's verdict reflects **whichever of the two is higher** (the binding constraint). If you're at 5% on IOPS but 95% on bandwidth, you're bandwidth-bound and the verdict is red. This is exactly how a real bottleneck behaves — the tightest limit wins.
+The verdict reflects **whichever of the two is higher** (the binding constraint), against the IBM 60% / 80% bands. At 10% core and 1.9% bandwidth, the sample is **FITS** (green).
+
+**Optional — Workload sensitivity.** A collapsed, optional section lets you enter **Sequential I/O %**, **Cache efficiency – random %**, and **Cache efficiency – sequential %**. Leave them blank and they do nothing — the standard result is unchanged. If you populate the cache-efficiency fields, the tool adds a *separate, clearly-flagged* "sensitivity-adjusted saturation" line showing how much the ceiling would move for a more- or less-cache-friendly workload (bounded to ±25% so it can't masquerade as hardware-grade precision). Every appearance carries the caveat that **cache hit rate is emergent and must be validated against Storage Insights** before it informs a commitment. This is a reasoning lever for "how sensitive is my sizing to a number I haven't measured yet," not a prediction.
 
 **Helper notes you may see:**
-- *Write-heavy warning* (over 50% writes): flash wears and slows more under heavy writes ("write amplification"), so consider a more conservative derate.
-- *Bandwidth-bottleneck warning*: your block size is large enough that you'll run out of GB/s before you run out of IOPS.
+- *Write-heavy warning* (over 50% writes): flash write amplification lowers effective IOPS, so the real saturation may sit below the estimate — validate in Storage Modeller.
+- *Bandwidth-bottleneck warning*: your block size is large enough that you'll run out of GB/s before IOPS.
 
-**How this justifies the sizing:** "At 150,000 IOPS and 1.2 GB/s, we're using under 5% of the array's realistic ceilings — green across the board — so this single FS9600 has ample performance headroom for this workload and years of growth."
+**How this justifies the sizing:** "At 150,000 IOPS the FS9600 core sits at 10% utilisation — the same figure Storage Modeller's System Core reports — with latency near its 0.11 ms floor and bandwidth under 2%. Green across the board, with the comfortable ceiling (900k IOPS) leaving years of runway."
 
 ---
 
@@ -139,257 +159,240 @@ The card's verdict reflects **whichever of the two is higher** (the binding cons
 
 **Needs:** Data today (TB). **Assumes if blank:** data reduction ratio, target utilisation, array max capacity. Growth is optional.
 
-**Logical (effective) data.** Your real-world data, today plus expected growth:
+**Logical (effective) data.** Your real-world data, today plus growth:
 > `Data today + Growth` → 200 + 50 = **250 TB logical**
 
-"Logical" means the size as your applications see it. This logical figure is also your **effective footprint** — the amount of effective capacity it consumes on the array.
+This logical figure is your **effective footprint** — the effective capacity it consumes on the array.
 
-**Physical flash consumed (informational).** How much actual flash that data occupies once compression/dedup do their job:
+**Physical flash consumed (informational).** How much actual flash the data occupies once compression/dedup work:
 > `Logical ÷ DRR` → 250 ÷ 3.5 = **71.4 TB** of physical flash
 
-This line uses *your* data-reduction ratio and is useful for understanding how much NAND you're burning and your endurance headroom. It does not drive the fit verdict.
+This uses *your* DRR and helps you understand NAND burn and endurance headroom. It does not drive the verdict.
 
-**Effective needed with headroom.** Because you never fill to 100%, the tool grosses the logical footprint up to your target:
+**Effective needed with headroom.** Because you never fill to 100%:
 > `Logical ÷ target%` → 250 ÷ 80% = **312.5 TB = 0.313 PBe**
 
-**Array fit.** The tool compares this effective demand against the array's **effective** capacity ceiling and reports **capacity utilisation** (here 0.313 ÷ 11.8 PBe ≈ **2.6%**). Green means it fits comfortably; red means the dataset is too large for one array and you need a larger model or a FlashSystem grid of several arrays.
+**Array fit.** Compared against the array's **effective** capacity ceiling:
+> Capacity utilisation = `(logical ÷ target%) ÷ effective-capacity` → 0.313 ÷ 11.8 PBe ≈ **2.6%**
 
-> **Why effective-vs-effective?** Effective capacity already accounts for data reduction, so the honest comparison is logical-data against effective-capacity (both "post-reduction" terms). The 11.8 PBe figure assumes a reference reduction ratio — if your data reduces better or worse than that, the realised effective capacity scales up or down accordingly. A single FS9600 enclosure tops out near 11.8 PBe; a grid of up to 32 systems scales to roughly 377 PBe.
+Green means it fits comfortably; red means you need a larger model or a Grid.
 
-**How this justifies the sizing:** "250 TB of data is a small fraction of the array's ~11.8 PBe effective capacity even after growth and headroom (about 2.6%), and it occupies only ~71 TB of physical flash — so capacity is not a constraint and there's substantial room to grow."
+> **Why effective-vs-effective?** Effective capacity already accounts for data reduction, so the honest comparison is logical-data against effective-capacity (both post-reduction terms). The 11.8 PBe figure assumes a reference reduction ratio — if your data reduces better or worse, realised effective capacity scales accordingly. A single FS9600 enclosure tops out near 11.8 PBe; a 32-system grid scales to roughly 377 PBe.
+
+**How this justifies the sizing:** "250 TB is ~2.6% of the array's ~11.8 PBe effective capacity even after growth and headroom, occupying only ~71 TB of physical flash — capacity is not a constraint, with substantial room to grow."
 
 ---
 
 ### Card 3 — Replication & HA: *"Which DR mode, how much link, how fresh a copy?"*
 
-**Needs:** RTT to the DR site. **Uses if available:** IOPS (to derive write rate) and WAN link speed. **Assumes if blank:** stream compression, block size, read/write split.
+**Needs:** RTT to the DR site. **Uses if available:** IOPS (to derive write rate) and WAN link speed. **Assumes if blank:** stream compression, block sizes, read/write split.
 
-**Replication mode.** The tool sorts your RTT into one of three bands and shows a colored mode badge:
-- **≤ 1 ms → PBHA SYNC**, RPO = 0 (the "always in sync" option; metro distance only).
-- **1 ms to 80 ms → PBR ASYNC**, RPO > 0 (the "shipping copies" option), refined into journaling or cycling once it knows your link speed.
-- **> 80 ms → not supported** — beyond the documented RTT limit for asynchronous PBR, the card turns red and tells you replication isn't supported at that distance (you'd need externally orchestrated DR).
+**Replication mode.** The tool sorts RTT into three bands:
+- **≤ 1 ms → PBHA SYNC**, RPO = 0 (metro only).
+- **1 ms to 80 ms → PBR ASYNC**, RPO > 0, refined into journaling or cycling once it knows your link speed.
+- **> 80 ms → not supported** — beyond the documented RTT limit for async PBR; the card turns red.
 
-Both thresholds (the 1 ms sync limit and the 80 ms async ceiling) are overridable in the Advanced section if IBM's guidance changes.
+Both thresholds are overridable in Advanced if IBM's guidance changes.
 
-**Replication bandwidth.** Replication only carries **writes**, so:
-> Write rate = `Write IOPS × block size` → 45,000 IOPS × 8 KB ≈ **360 MB/s**
+**Replication bandwidth (v5: sized on write transfer size).** Replication carries **writes only**, and v5 sizes them at the *write* block size:
+> Write rate = `write IOPS × write KiB` → 45,000 × 16 KiB ≈ **737 MB/s**
 
-Then it subtracts what compression saves on the wire:
-> On-wire = `write rate ÷ stream compression` → 360 ÷ 2 = **180 MB/s = 1.4 Gbps**
+Then subtract what compression saves on the wire:
+> On-wire = `write rate ÷ stream compression` → 737 ÷ 2 ≈ **369 MB/s = 2.9 Gbps**
 
-This "on-wire" number is the actual traffic your network link must carry between sites.
+(Note: with 8 KiB writes this would be ~369 MB/s / ~185 MB/s on-wire — the sample's 16 KiB writes double it. This is exactly the kind of thing the read/write split now surfaces honestly.)
 
-**Link capacity & utilisation.** Network links are quoted in Gbps (gigabits), but data is measured in MB/s (megabytes). The conversion is `1 Gbps = 125 MB/s`. The tool also reserves ~20% of the link for overhead and assumes ~80% is usable:
-> Usable link = `link Gbps × 125 × 80%` → 10 × 125 × 0.8 = **1,000 MB/s**
-> Link utilisation = `on-wire ÷ usable link` → 180 ÷ 1,000 = **18%**
+**Link capacity & utilisation.** Links are quoted in Gbps, data in MB/s (`1 Gbps = 125 MB/s`), and the tool reserves ~20% for overhead:
+> Usable link = `Gbps × 125 × 80%` → 10 × 125 × 0.8 = **1,000 MB/s**
+> Link utilisation = `on-wire ÷ usable link` → 369 ÷ 1,000 ≈ **36.9%**
 
-Low link utilisation (green) means the pipe comfortably keeps up, so async replication will run in the good *journaling* mode and stay just seconds behind. High utilisation (red) means the link is the bottleneck and you'll fall into *cycling* mode (larger RPO) — fix it with a faster link or by reducing change rate.
+Green means the pipe keeps up and async runs in the good *journaling* mode; high utilisation (red) means you'll fall into *cycling* (larger RPO) — fix with a faster link or lower change rate.
 
-**Journal buffer (sync only).** In synchronous mode, the array briefly holds writes in memory while waiting for the far site to confirm. The amount of memory needed is the "bandwidth-delay product":
-> Buffer ≈ `write rate × RTT` (a small number for low-latency links)
+**Journal buffer (sync only).** In synchronous mode the array briefly holds writes in memory awaiting far-site confirmation: `Buffer ≈ write rate × RTT`. At 12 ms the sample is async, so this is 0.
 
-**How this justifies the sizing:** "At 12 ms RTT we replicate asynchronously with PBR. The workload changes ~360 MB/s, which compresses to ~180 MB/s on the wire — only 18% of a 10 Gbps link — so the copy stays seconds-fresh in journaling mode with plenty of link headroom."
+**How this justifies the sizing:** "At 12 ms RTT we replicate asynchronously with PBR. The workload's 45,000 writes at 16 KiB change ~737 MB/s, compressing to ~369 MB/s on the wire — about 37% of a 10 Gbps link — so the copy stays seconds-fresh in journaling mode, with room to spare."
 
 ---
 
 ### Card 4 — System Memory: *"Is there enough DRAM for cache and replication buffers?"*
 
-**Needs:** IOPS (for write-cache context) and/or RTT (for sync buffer). **Assumes if blank:** node memory, read/write split, block size.
+**Needs:** IOPS (for write-cache context) and/or RTT (for sync buffer). **Assumes if blank:** node memory, read/write split, block sizes.
 
-**Node memory allocation.** Starts from the array's total memory and carves out:
-- **OS + metadata reserve** (~20%) — memory the system keeps for itself.
-- **Usable for cache** — what's left for data caching.
+**Node memory allocation.** From the array's total memory (FS9600 default **1,536 GB**), carve out:
+- **OS + metadata reserve** (~20%) → 307 GB
+- **Usable for cache** → 1,229 GB
 
-**Cache allocation.** The usable cache is split into a smaller **write cache** (~15%) and a larger **read cache** (~85%). Reads benefit from more cache (hot data served instantly); the write cache mainly absorbs bursts before flushing to flash.
+**Cache allocation.** Usable cache splits into a smaller **write cache** (~15% → 184 GB) and a larger **read cache** (~85% → 1,045 GB). Reads benefit from more cache; the write cache absorbs bursts before flushing.
 
-**PBHA journal buffer.** If you're in synchronous mode, the in-flight write buffer (from Card 3) also lives in memory and is added on top.
+**PBHA journal buffer.** In synchronous mode the in-flight buffer from Card 3 also lives in memory and is added on top. (Async → 0.)
 
-**Memory utilisation.** Adds write cache + journal buffer and expresses it as a percent of usable memory. With the FS9600's large DRAM, this almost always lands comfortably green — the card mainly exists to flag the rare case where a *very* high write rate over a sync link makes the journal buffer large enough to crowd out read cache. If you see that warning, consider whether async (PBR) is acceptable instead.
+**Memory utilisation.** Write cache + journal buffer as a percent of usable memory → sample **15.0%**. With the FS9600's large DRAM this almost always lands green; the card mainly flags the rare case where a very high write rate over a sync link makes the journal buffer large enough to crowd read cache.
 
-**How this justifies the sizing:** "Cache and replication buffers consume a small fraction of node memory, so the standard memory configuration is sufficient — no memory upgrade is required for this workload."
+**How this justifies the sizing:** "Cache and replication buffers use ~15% of usable node memory, so the standard configuration is sufficient — no memory upgrade required."
 
 ---
 
 ## 5. Performance Scaling Charts — full guide and legend
 
-The Performance Scaling section appears below the four result cards (collapsed/expanded with the toggle arrow). It contains two side-by-side charts — one for IOPS, one for throughput — that plot all three FlashSystem models on the same axes simultaneously. The goal is to show not just whether today's workload fits, but **where on the latency curve that workload sits, and at what growth point each model starts to become long in the tooth**.
-
-Both charts update live as you type, just like the result cards.
+The Performance Scaling section (below the four cards, expandable) contains two charts — one for IOPS, one for throughput — plotting all three FlashSystem models on the same axes. The goal is to show not just whether today's workload fits, but **where on the latency curve it sits, and at what growth point each model runs out of runway**. Both charts update live as you type.
 
 ---
 
 ### 5.1 The two charts
 
 **Chart 1 — IOPS vs. Estimated Latency**
-- X-axis: Total IOPS, from 0 to beyond the FS9600 ceiling (up to ~7.4 million, 18% past the FS9600 ceiling).
-- Y-axis: Estimated per-I/O latency in milliseconds (ms).
-- Three curves: one for each model, from zero load up to that model's own ceiling (where the curve ends).
+- X-axis: Total IOPS. In v5 the domain is anchored to the largest model's **saturation point** (~1.5M for FS9600), expanding if your current or projected workload is higher.
+- Y-axis: Estimated per-I/O latency (ms), auto-scaled.
+- Three curves, one per model, each running to that model's own **saturation point**.
 
 **Chart 2 — Throughput vs. Estimated Latency**
-- X-axis: Total throughput in GB/s, from 0 to beyond the FS9600 ceiling (~101 GB/s).
-- Y-axis: Same estimated latency scale as the IOPS chart.
-- Three curves: one for each model, to that model's bandwidth ceiling.
+- X-axis: Total throughput (GB/s), to beyond the FS9600 bandwidth ceiling (~86 GB/s).
+- Y-axis: same latency scale.
+- Three curves, one per model, to each model's bandwidth ceiling.
 
-The throughput figure is derived from your IOPS and block size: `(IOPS ÷ 1000) × block KB ÷ 1000 = GB/s`. Both charts update together because they share the same workload inputs.
+The throughput figure uses the same transfer-size-aware math as Card 1.
 
 ---
 
 ### 5.2 Complete element legend
 
-#### Background zone fills
+#### Background zone fills — **now follow the selected model (v5 fix)**
 
-The chart background is divided into four colored bands. Boundaries are anchored to the **FS9600** (the widest model) so all three curves can be read against the same reference scale. The zone labels appear at the top of each band.
+The chart background is divided into colored bands. **In v5 the boundaries follow the model you've selected**, so the shaded bands mean the same thing as the Performance card's verdict for that model. (Earlier builds anchored the bands to FS9600 regardless of selection, which made a smaller selected model look mis-scaled.)
 
-| Zone label | Color | X-axis boundary (IOPS chart) | X-axis boundary (BW chart) | What it means |
-|---|---|---|---|---|
-| **COMFORTABLE** | Faint green | 0 → derate threshold (default: 0 → 3,780,000 IOPS) | 0 → 51.6 GB/s | Load is below the mixed-workload derate point. Latency is low and flat. This is the target operating region. |
-| **MARGINAL** | Faint amber | Derate threshold → 87.5% of FS9600 ceiling (3,780,000 → 5,512,500 IOPS) | 51.6 → 75.25 GB/s | Above the derate point, latency begins rising. The system still works but there is little headroom for bursts or growth. |
-| **LATENCY↑** | Faint red | 87.5% → 100% of FS9600 ceiling (5,512,500 → 6,300,000 IOPS) | 75.25 → 86 GB/s | Latency is climbing steeply. The queueing hockey-stick is in full effect. Operating here degrades application response times and risks saturation under any spike. |
-| **GRID →** | Faint gray | Beyond FS9600 ceiling (> 6,300,000 IOPS) | > 86 GB/s | A single FS9600 is saturated. A FlashSystem Grid (up to 32 nodes) continues the scaling story from this point. |
+| Zone label | Color | X-axis boundary (selected model) | What it means |
+|---|---|---|---|
+| **COMFORTABLE** | Faint green | 0 → comfort% of saturation (default 0 → 60%) | Below the comfort target. Latency is low and flat. Target operating region. |
+| **MARGINAL** | Faint amber | comfort% → 87.5% of saturation | Latency begins rising. Works, but little headroom for bursts or growth. |
+| **LATENCY↑** | Faint red | 87.5% → 100% of saturation | Latency climbing steeply — the queueing hockey-stick. Risky under any spike. |
+| **GRID →** | Faint gray | Beyond the model's saturation | A single array is effectively saturated; a FlashSystem Grid continues the scaling story. |
 
-> The derate threshold uses whatever value is set in the Advanced panel (default 60%). If you override the derate, the green/amber boundary shifts accordingly, and the zone coloring updates live.
+For the FS9600 sample, that puts the green band at 0 → 900,000 IOPS, amber 900,000 → 1,312,500, red 1,312,500 → 1,500,000, then GRID beyond.
 
----
-
-#### Model curves
-
-Three performance curves are drawn, one per model. Each curve runs from zero load to **that model's own ceiling** — the curve ends there (it does not continue as a horizontal plateau into saturation). This is intentional: beyond a model's ceiling, behavior is undefined, and the vertical dashed marker (see below) signals where that boundary is.
-
-| Curve color | Model | IOPS ceiling | BW ceiling | Baseline latency at zero load |
-|---|---|---|---|---|
-| **Cyan** `#00b4d8` | FlashSystem 9600 | 6,300,000 IOPS | 86 GB/s | 0.10 ms |
-| **Purple** `#7c3aed` | FlashSystem 7600 | 4,300,000 IOPS | 55 GB/s | 0.12 ms |
-| **Amber/gold** `#f59e0b` | FlashSystem 5600 | 2,600,000 IOPS | 30 GB/s | 0.15 ms |
-
-Reading the curves together: the FS5600 curve ends first (shorter runway), FS7600 next, FS9600 last. For any given workload, the gap between where your NOW dot lands on each curve shows you the difference in latency impact across models at that load level — and how much additional runway each larger model provides before the hockey stick steepens.
+> If you override the comfort% in the Advanced panel, the green/amber boundary shifts and the coloring updates live.
 
 ---
 
-#### Vertical dashed ceiling markers
+#### Model curves — **selected model emphasised (v5)**
 
-A dashed vertical line in each model's color runs from the top to the bottom of the chart (and slightly below the X-axis) at that model's ceiling. A small label — **FS9600**, **FS7600**, or **FS5600** — appears below the X-axis at each line. These markers show exactly where each model's curve ends and make it easy to read off "if my workload were X IOPS, which models can still handle it?"
+Three curves are drawn, one per model. In v5 the **selected model's curve is bold and fully opaque; the other two are faded to thin context lines**, so your eye tracks the curve the verdict and zones actually describe. Each curve runs from zero load to that model's own saturation point (where it ends).
+
+| Curve color | Model | Saturation (mixed) | Datasheet peak (ref) | BW ceiling | Base latency (~0 load) |
+|---|---|---|---|---|---|
+| **Cyan** `#00b4d8` | FlashSystem 9600 | **1,500,000 IOPS** (calibrated) | 6,300,000 | 86 GB/s | 0.113 ms |
+| **Purple** `#7c3aed` | FlashSystem 7600 | **850,000 IOPS** (estimate) | 4,300,000 | 55 GB/s | 0.125 ms |
+| **Amber/gold** `#f59e0b` | FlashSystem 5600 | **450,000 IOPS** (estimate) | 2,600,000 | 30 GB/s | 0.140 ms |
+
+Reading them together: FS5600 saturates first (shortest runway), FS7600 next, FS9600 last. The **datasheet peak** columns are the theoretical 4K-read-hit maxima and are *not* the axis — they're shown only as the contrast that motivates the mixed-workload saturation.
+
+> **Why the weaker model can *look* better on the raw curves.** Because each curve blows up near *its own* saturation and the Y-axis is capped, a lower-saturation model (say FS7600) shoots off the top of the chart early, leaving only its comfortable left segment visible — while FS9600, being stronger, stays on-chart longer and is the one you *see* climbing into the amber/red bands. At any shared IOPS point the bigger model is always lower-latency; the v5 emphasis (bold selected curve, per-model saturation markers) is what keeps this from being misread.
 
 ---
+
+#### Vertical dashed saturation markers
+
+A dashed vertical line in each model's color runs the height of the chart at that model's **saturation point**, with a small label below the X-axis (**FS9600 / FS7600 / FS5600**). The **selected** model's marker is emphasised and tagged with a ◄ pointer. These make it easy to read off "if my workload were X IOPS, which models can still handle it?"
 
 #### NOW dot (filled circle)
 
-A filled circle appears on **each model's curve** at the X-position corresponding to your current workload (IOPS or throughput) as soon as you enter an IOPS value in the input panel. The dot's color matches the model's curve. A **"NOW"** label appears above the topmost dot (the model with the most headroom, since it has the lowest latency at the same load).
-
-Reading the NOW dots: they show you simultaneously where today's workload sits on all three models. If the NOW dot on FS5600 is in the red zone but the NOW dot on FS7600 is in the green zone, the workload is too heavy for FS5600 and FS7600 is the minimum viable model. If all three NOW dots are deep in the green zone, any model is viable and the selection can be driven by capacity or other factors.
-
-If your IOPS exceed a model's ceiling, the NOW dot for that model is plotted at that model's ceiling (the rightmost end of its curve), indicating saturation.
-
----
+A filled circle sits on **each model's curve** at your current workload's X-position as soon as you enter IOPS. Colors match the curves; a **"NOW"** label sits above the topmost (lowest-latency) dot. If your IOPS exceed a model's saturation, its NOW dot is pinned at that model's saturation point (rightmost end of its curve).
 
 #### +Nyr dot (hollow circle)
 
-A hollow circle (open ring) appears on each model's curve at the X-position representing your **projected future workload**. It appears only when both growth inputs are filled in:
-- **IOPS growth rate (% per year):** how fast you expect the workload to grow annually.
-- **Projection horizon (years):** how many years out you want to project.
+A hollow ring appears on each curve at your **projected** workload, when both growth inputs are filled:
+- **IOPS growth rate (% per year)** and **Projection horizon (years)**.
+- Projected IOPS = `Current IOPS × (1 + growth% ÷ 100) ^ years`.
 
-Projected IOPS = `Current IOPS × (1 + growth rate / 100) ^ years` — standard compound annual growth.
+A **"+Nyr"** label sits above the topmost projected dot. If a model's +Nyr dot lands in amber/red while NOW is green, that model lacks runway for the projected horizon — an upgrade or Grid conversation is warranted.
 
-A **"+Nyr"** label (where N is the number of years) appears above the topmost projected dot. The arrow from NOW dot to +Nyr dot is implicit: you read the story as "today we're here, in N years we'll be here, and that's the latency impact of that growth on each model."
+#### Axes
 
-If the +Nyr dot on a model lands in the amber or red zone while the NOW dot is in the green zone, that model has insufficient runway for the projected growth period and an upgrade or Grid conversation is warranted before that horizon.
-
----
-
-#### Y-axis: Estimated latency (ms)
-
-The Y-axis scale is dynamic — it auto-sizes to fit the data. It always shows enough range to make the NOW and +Nyr dots visible, and expands if the current workload is at a high utilisation where latency is elevated. Tick labels use two decimal places below 1 ms (e.g., "0.10"), one decimal place between 1 ms and 10 ms (e.g., "2.5"), and whole numbers above 10 ms.
-
-The Y-axis range is anchored primarily to the 90th-percentile latency of each model's curve (roughly the latency at 90% of ceiling), then expanded to ensure current and projected dots are always visible. If all three dots are in the comfortable zone, the scale is tight and the flat region of the curve is clearly visible; as load increases toward the ceiling, the scale expands to show the hockey-stick shape.
-
----
-
-#### X-axis: IOPS or GB/s
-
-The X-axis extends from 0 to approximately 118% of the FS9600 ceiling, leaving room to display the "GRID →" zone and making the FS9600 ceiling marker clearly visible before the right edge. Tick intervals are automatically rounded to clean values (e.g., 1M, 2M, 3M... IOPS or 20, 40, 60... GB/s).
+- **Y-axis (latency, ms)** auto-sizes to keep the NOW and +Nyr dots visible, anchored near the 90th-percentile latency of the visible curves and expanding as load rises toward saturation. Tick labels: 2 dp below 1 ms, 1 dp from 1–10 ms, whole numbers above 10 ms.
+- **X-axis (IOPS or GB/s)** runs from 0 to ~118% of the reference saturation/ceiling, with clean rounded tick intervals.
 
 ---
 
 ### 5.3 The latency model — what it is and what it is not
 
-The latency curves use a **queueing-theory-inspired model** (M/D/1 queue, deterministic service time):
+v5 uses the **textbook queueing response-time formula** (M/M/1 sojourn time with constant service time):
 
-> `L(u) = L₀ × (1 + 1.5 × u² / (1 − 0.98u)^1.1)`
+> `L(u) = base service time ÷ (1 − u)`   where `u = load ÷ saturation` (clamped just below 1)
 
-where:
-- `L₀` = baseline latency at near-zero load for that model (0.10 ms for FS9600, 0.12 ms for FS7600, 0.15 ms for FS5600).
-- `u` = utilisation = `load ÷ ceiling` (clamped to 0.9995 at the ceiling).
-"The absolute breaking point of this system happens at 98% traffic."
+- `base` = base service time at near-zero load (FS9600 0.113 ms, FS7600 0.125 ms, FS5600 0.140 ms).
+- `saturation` = the model's mixed-workload saturation IOPS (or its bandwidth ceiling, on the throughput chart).
 
-**What this model gets right:** the shape — flat at low load, modest rise through the middle, steep hockey-stick above roughly 80–90% of ceiling. This shape is a fundamental property of any system with a finite service rate, not an IBM-specific quirk. It correctly conveys *why* you derate to 60% (the curve is still flat there) and *why* operating above 90% is dangerous (the curve goes nearly vertical).
+**What this model gets right:** it is calibrated. For FS9600 it reproduces IBM Storage Modeller's response-time curve to within about **5%** across the operating range — e.g. at 150k IOPS it gives 0.126 ms vs Storage Modeller's 0.1259 ms, and the FITS / MARGINAL / OVER transitions land on Storage Modeller's own amber (60%) and red (80%) core thresholds. The shape — flat, then a knee, then near-vertical — is a fundamental property of any finite-service-rate system, and it's why you plan to a comfort target well below saturation.
 
-**What this model does not do:** produce accurate latency numbers. The actual measured latency of a specific FlashSystem array depends on cache hit rates, workload sequentiality, queue depth, FlashCore Module generation, firmware version, and dozens of other factors not present in this tool. The curve values are deliberately illustrative — treat them as showing **relative behavior** across models and utilisation levels, not as latency SLAs or specifications.
-
-The bottom of the chart legend includes a disclaimer to this effect for client-facing conversations.
+**What this model does not do:** replace Storage Modeller. It runs slightly *optimistic* in the mid-range (a few percent below Storage Modeller's latency around 40–60% load), which is inherent to the simple M/M/1 form. Real measured latency also depends on cache hit rate, sequentiality, queue depth, FlashCore Module generation, and firmware — none of which this single formula captures. Treat the curve as **calibrated-directional**: good enough to explain relative behaviour and land in the right ballpark, not a latency SLA. The chart legend carries a disclaimer to this effect for client-facing use.
 
 ---
 
 ### 5.4 The growth projection inputs
 
-Two fields appear above the charts:
+Two fields above the charts:
 
-**IOPS growth rate (% per year):** the expected annual compound growth in IOPS demand. Leave blank if you want to show only the current-workload NOW dots without a projection. Common ranges: 10–20% for moderate enterprise growth, 30–50%+ for environments with active expansion or AI/analytics workload growth.
+- **IOPS growth rate (% per year)** — expected annual compound growth. Leave blank to show only the NOW dots. Common ranges: 10–20% moderate; 30–50%+ for active expansion or AI/analytics growth.
+- **Projection horizon (years)** — how far out to project (default 3 if a rate is entered; valid 1–10).
 
-**Projection horizon (years):** how far out to project. Default assumption is 3 years if the field is left blank but a growth rate is entered. Valid range is 1–10 years.
-
-Both fields are cleared by the **Clear** button. They do not affect any of the four result cards — they are purely for the chart's +Nyr dot.
+Both are cleared by **Clear** and affect only the chart's +Nyr dots, not the four result cards.
 
 ---
 
 ### 5.5 How to use the charts in a client conversation
 
-**Model selection:** when the customer hasn't decided which FlashSystem model they need, pull up the charts before entering any numbers. Walk them through the three curves and explain that each one represents a different "runway" — FS5600 gives you the shortest, FS9600 the longest. Then enter their IOPS and let the NOW dots land. If all three NOW dots are in green, you have options; if FS5600's dot is in red, that model is off the table before you've discussed price.
+**Model selection:** before entering numbers, walk the customer through the three curves — each is a different "runway," FS5600 shortest, FS9600 longest. Enter their IOPS and let the NOW dots land. All green → you have options; FS5600 in red → it's off the table before price comes up.
 
-**Growth story:** enter the customer's projected growth rate and a 3-year horizon. Move the NOW and +Nyr dots in front of them and ask: "Today you're here. In three years, you're here. On the FS7600 that puts you in the marginal zone — on the FS9600 you're still comfortable. That's the conversation about whether the premium for the FS9600 is worth the headroom." This is a more credible framing than "you'll hit the ceiling in 3 years" because it shows the trajectory, not just a binary pass/fail.
+**Growth story:** enter their growth rate and a 3-year horizon. "Today you're here; in three years you're here. On FS7600 that's marginal — on FS9600 you're still comfortable. That's the conversation about whether the FS9600 premium buys worthwhile headroom." More credible than a binary pass/fail because it shows the trajectory.
 
-**Grid discussion:** if the +Nyr dot crosses into the "GRID →" gray zone, the single-array story is over at that horizon. The gray zone is your opening to introduce FlashSystem Grid — point to it on the chart and explain that IBM's grid architecture picks up where the single enclosure leaves off, scaling to 32 nodes.
+**Grid discussion:** if a +Nyr dot crosses into "GRID →", the single-array story ends at that horizon — your opening to introduce FlashSystem Grid.
 
 ---
 
 ## 6. How to present a sizing using these results
 
-A clean way to explain a design to a customer or manager, in their language:
+A clean way to explain a design, in business language:
 
-> *"Your workload of 150,000 IOPS and 250 TB of data fits on a single FlashSystem 9600 with room to spare. Performance runs under 5% of the array's realistic limits, capacity uses a small fraction of available flash even after growth, and your data changes slowly enough that a standard 10 Gbps link keeps a near-real-time copy at your DR site. We sized one array, not two, because every dimension — speed, space, replication, and memory — sits comfortably in the green with headroom for several years of growth."*
+> *"Your workload of 150,000 IOPS and 250 TB of data fits on a single FlashSystem 9600 with room to spare. The controller core runs at about 10% — the same figure IBM's own Storage Modeller reports — capacity uses under 3% of available effective flash even after growth, and your data changes slowly enough that a 10 Gbps link keeps a seconds-fresh copy at your DR site. We sized one array, not two, because every dimension — speed, space, replication, and memory — sits comfortably in the green with headroom for several years of growth."*
 
-That paragraph is exactly what the four green cards are telling you, translated into a business justification. The **assumed/purple** tags tell you which parts of that story rest on industry defaults and would be worth confirming with real measurements (block size, read/write split, and achievable data-reduction ratio are the three that most influence the outcome).
+The **assumed/purple** tags tell you which parts rest on defaults worth confirming (block sizes, read/write split, and achievable DRR are the three that most influence the outcome). And because the performance numbers are now calibrated to Storage Modeller, you can add: *"these figures line up with a Storage Modeller run for this workload — this tool just shows the arithmetic behind them."*
 
-For the charts, a complementary line for client conversations: *"The performance curve shows this workload is sitting in the flat, comfortable part of the FS9600's range — well before the hockey stick. Even projecting 20% annual IOPS growth over three years, we stay in the green zone. That's why we're recommending the FS9600: not just for today, but for the next refresh cycle."*
+For the charts: *"The performance curve shows this workload in the flat, comfortable part of the FS9600's range — well before the hockey stick. Even at 20% annual IOPS growth over three years, we stay green. That's why we recommend the FS9600: not just for today, but for the next refresh cycle."*
 
 ---
 
 ## 7. Accuracy & calibration notes (important — please read)
 
-The arithmetic in the tool is sound and internally consistent. This section documents the methodology choices and the corrections applied in this version, plus the few minor items still worth your attention. **The capacity basis, the RTT thresholds, and the FS9600 ceilings described below have been corrected in this build.**
+The arithmetic is sound and internally consistent, and every formula is on-screen so you can audit it. This section documents the v5 methodology and its honest limits.
 
-### 7.1 Capacity card uses effective-vs-effective (corrected)
+### 7.1 The performance engine is calibrated to IBM Storage Modeller (v5)
 
-Earlier the capacity card reduced logical data by the DRR to a *physical/raw* demand and then divided it by an *effective* ceiling — mixing two different capacity units and understating utilisation for large datasets. This is now fixed: the fit verdict compares your **logical (effective) data plus headroom** against the array's **effective** capacity. Your DRR still appears, now driving the "physical flash consumed" informational line, which tells you how much NAND the data occupies.
+The headline change. The tool was validated against an actual **IBM Storage Modeller** export for an FS9600 mixed workload (70/30, 8/16 KiB, ~55% cache hit). Three corrections came out of it:
 
-> Capacity utilisation = `(logical data ÷ target%) ÷ (effective capacity in TB) × 100`
+1. **Realistic saturation, not a derated peak.** Earlier builds took the datasheet 4K-read-hit peak (6.3M IOPS) and multiplied by a flat 60% derate to get a "usable" ~3.78M ceiling. Storage Modeller shows the FS9600 core actually saturates near **1.5M IOPS** for a real mixed workload — roughly **3–4× lower**. v5 measures against that calibrated saturation point; the 6.3M peak is retained only as a labelled theoretical-max reference. Core utilisation now equals `IOPS ÷ saturation` and reads directly against Storage Modeller's "System Core %."
+2. **Queueing latency.** The ad-hoc curve was replaced with `service time ÷ (1 − utilisation)`, which reproduces Storage Modeller's FS9600 response times to within ~5% (Section 5.3).
+3. **Transfer-size-aware throughput.** Reads and writes are sized separately by block size, and the byte rate uses binary KiB — so throughput matches Storage Modeller's figure exactly (1,597 MB/s = 1,523 MiB/s for the sample) instead of the old flat-block 1,200 MB/s.
 
-Note that the array's effective-capacity figure assumes a reference data-reduction ratio. If your workload reduces better or worse than that reference, the realised effective capacity scales with it — so treat the headline percentage as "good if your data reduces about as expected," and use the physical-flash line plus your measured DRR for a closer look.
+**Honest caveats:**
+- Only **FS9600 is calibrated directly** to this Storage Modeller file. **FS7600 (850k) and FS5600 (450k) saturation points are scaled estimates**, labelled as such and overridable per model in the Advanced panel. If you obtain Storage Modeller runs for those two at a matched workload, drop the real saturation numbers into the override fields and they become exact too.
+- The FS7600 tab in the source export used a *different* cache-hit assumption (75%) than FS9600 (~51%) — a different workload, not just different hardware — so FS9600 is the anchor and the others are scaled from it rather than read directly.
+- The queueing model is slightly **optimistic** (a few percent low on latency) in the 40–60% range. It's disclaimed, and it's a rounding error next to the old 3–4× ceiling error.
 
-### 7.2 Synchronous/asynchronous RTT bands (corrected)
+### 7.2 Capacity card uses effective-vs-effective
 
-The tool previously flipped from "PBHA synchronous (RPO 0)" to "PBR asynchronous" at 80 ms — which wrongly labelled metro-and-beyond links as zero-data-loss. It now uses three correct bands:
-- **≤ 1 ms → PBHA synchronous.** IBM guidance is sub-millisecond ideal, because the application waits for the far site on every write.
-- **1 ms to 80 ms → PBR asynchronous.** 80 ms is IBM's documented upper RTT limit for asynchronous PBR.
-- **> 80 ms → not supported.** Beyond 80 ms the tool flags replication as unsupported rather than silently sizing it.
+The fit verdict compares your **logical (effective) data plus headroom** against the array's **effective** capacity (both post-reduction terms). Your DRR drives the informational "physical flash consumed" line.
+> Capacity utilisation = `(logical ÷ target%) ÷ (effective capacity in TB) × 100`
 
-Both thresholds are exposed as overridable Advanced fields (PBHA sync RTT limit, PBR async max RTT) so you can adjust them if IBM updates its supported limits.
+The effective-capacity figure assumes a reference DRR; if your data reduces better or worse, realised effective capacity scales with it — so treat the headline percentage as "good if your data reduces about as expected," and use the physical-flash line plus your measured DRR for a closer look.
 
-### 7.3 Array ceilings — current-generation models (FS9600 / FS7600 / FS5600)
+### 7.3 Array ceilings — current-generation models
 
-The model selector loads the single-enclosure ceilings below. These replace the previous-generation values that were originally hard-coded, and you can override any of them in the Advanced panel.
+The model selector loads the single-enclosure ceilings below; override any of them in Advanced.
 
 | Ceiling | **FS9600** (5078-A40) | **FS7600** (5075-A30) | **FS5600** (5127-A20) |
 |---|---|---|---|
-| Peak IOPS (4K read-hit) | 6,300,000 | 4,300,000 | 2,600,000 |
+| Datasheet peak IOPS (4K read-hit) | 6,300,000 | 4,300,000 | 2,600,000 |
+| **Mixed-workload saturation (v5)** | **1,500,000** (calibrated) | **850,000** (est.) | **450,000** (est.) |
+| Base service time (chart, ~0 load) | 0.113 ms | 0.125 ms | 0.140 ms |
 | Bandwidth | 86 GB/s | 55 GB/s | 30 GB/s |
 | Effective capacity (single enclosure) | 11.8 PBe | 7.2 PBe | 2.5 PBe |
 | Effective capacity (32-system grid) | ~377 PBe | ~230 PBe | ~77 PBe |
@@ -397,45 +400,56 @@ The model selector loads the single-enclosure ceilings below. These replace the 
 | Form factor / drive slots | 2U / 32 | 2U / 32 | 1U / 12 |
 | Largest FlashCore Module | 105.6 TB | 52.8 TB | 52.8 TB |
 
-Notes on the figures:
-- **IOPS** are IBM's best-case 4K read-hit numbers; the tool then applies the **60% mixed-workload derate** (shared across all three) before reporting utilisation. The derate threshold is also the green/amber boundary in the performance charts.
-- **Bandwidth** is peak read bandwidth per single enclosure (the larger "grid" bandwidth figures sometimes quoted are 32-system aggregates — divide by 32 for a single box).
-- **Effective capacity** assumes a reference data-reduction ratio baked into the FlashCore Modules; realised capacity scales with how well your data actually reduces (see 7.1).
-- **Node memory** defaults to a documented, commonly-shipped configuration per model. The FS9600 figure (1,536 GB) is the per-node maximum; FS7600 and FS5600 also offer other memory options — override the field if your system differs. The memory model (20% OS reserve, 15% write cache) is a heuristic and applies identically across models.
-- **Shared software limits** (PBHA sync ≤ 1 ms, PBR async ≤ 80 ms, 60% derate) are Storage Virtualize 9.1.2 behaviours, not model-specific.
-- **Chart baseline latencies** used in the performance scaling curves (FS9600: 0.10 ms, FS7600: 0.12 ms, FS5600: 0.15 ms) are illustrative reference points, not published IBM specifications. They represent approximate NVMe all-flash response times at near-zero load for similarly-classed arrays and are used solely to give the latency curves a realistic shape.
+Notes:
+- **Datasheet peak IOPS** are IBM's best-case 4K-read-hit numbers — a reference only. The tool sizes against the **mixed-workload saturation** row and the **comfort %** (default 60%, also the green/amber chart boundary).
+- **Bandwidth** is peak read bandwidth per single enclosure (larger "grid" figures are 32-system aggregates — divide by 32 for one box).
+- **Effective capacity** assumes a reference DRR; realised capacity scales with how well your data reduces (see 7.2).
+- **Node memory** defaults to a documented, commonly-shipped configuration; FS9600's 1,536 GB is the per-node maximum. Override if your system differs. The memory heuristic (20% OS reserve, 15% write cache) applies identically across models.
+- **Shared software limits** (PBHA sync ≤ 1 ms, PBR async ≤ 80 ms, the comfort/derate model) are Storage Virtualize 9.1.2 behaviours, shared across the three FlashSystem models and with SVC SV3.
+- **Base service times** and the FS7600/FS5600 saturation points are calibrated/scaled estimates, not published IBM specifications — validate per model in Storage Modeller before committing.
 
-These remain *estimates*. Always confirm current limits on IBM's official *Configuration limits* page for v9.1.x and in the IBM Configurator before quoting a bill of materials, since marketing figures and formally supported limits can differ.
+Always confirm current limits on IBM's official *Configuration limits* page for v9.1.x and in the IBM Configurator before quoting a bill of materials.
 
-### 7.4 Minor notes
+### 7.4 Synchronous/asynchronous RTT bands
 
-- **Decimal units throughout.** The tool uses decimal conventions (1 MB = 1000 KB, 1 GB/s = 125 MB/s, 1 PB = 1000 TB), which matches how IBM markets bandwidth and capacity. Just be aware these are ~2–7% smaller than the binary (1024-based) equivalents an OS might report.
-- **Journal buffer multiplies RTT by 2.** The field is labelled "RTT" (already round-trip), and the buffer formula multiplies it by 2 again. If RTT is genuinely round-trip, this over-sizes the buffer roughly 2×. It errs on the safe (over-provisioned) side and the amounts are tiny, but the intent should be made consistent: either label the input one-way latency, or drop the ×2.
-- **Performance ceiling vs block size.** The IOPS ceiling is a 4K-read-hit figure but the workload may use larger blocks. The tool correctly compensates by also checking bandwidth and taking the worse of the two, so this is handled — just know that the IOPS-utilisation line alone shouldn't be read in isolation for large-block workloads.
-- **Chart zone boundaries use the FS9600 as the reference model.** The green/amber/red/gray zone fills are fixed to FS9600's ceiling so all three curves can be compared on a single background. This means the FS7600 curve ends inside the amber zone (its ceiling is at ~68% of the IOPS X-axis) and the FS5600 curve ends in the green zone (ceiling at ~41%). This is intentional — it visually shows that FS7600 and FS5600 "run out" before the X-axis does, reinforcing why larger models or a Grid are needed beyond those points.
-- **Unused constant.** A `perVolumeKB` (per-volume metadata) constant is defined in the memory model but never used; harmless, but it implies a per-volume overhead the card doesn't actually compute. If per-volume metadata matters for your sizing, wire it in; otherwise remove it to avoid confusion.
+Three correct bands, both thresholds overridable in Advanced:
+- **≤ 1 ms → PBHA synchronous** (RPO 0) — sub-millisecond ideal, because the application waits for the far site on every write.
+- **1 ms to 80 ms → PBR asynchronous** — 80 ms is IBM's documented upper RTT limit for async PBR.
+- **> 80 ms → not supported** — flagged rather than silently sized.
+
+### 7.5 Fixes and remaining minor notes
+
+- **Excel export is repaired (v5).** The generated `.xlsx` previously had a malformed zip central directory (a missing "last-modified date" field) that strict readers — openpyxl, Google Sheets, automated pipelines — rejected, even though Excel/LibreOffice opened it via a lenient fallback. This is fixed; the export now opens cleanly everywhere.
+- **Export chart artifact fixed (v5).** The Growth Projection series had an off-by-one range that appended a phantom `(0,0)` point, producing a "boomerang" sweep to the origin. The range is corrected and the projection series draw as straight year-to-year segments.
+- **Chart zones follow the selected model (v5).** Previously the shaded bands were fixed to FS9600; they now scale to whichever model is selected, and the selected curve is emphasised with the others faded to context (Section 5.2).
+- **Units.** Capacity and bandwidth *ceilings* use decimal conventions (1 GB/s = 125 MB/s, 1 PB = 1000 TB), matching how IBM markets them. Throughput **transfer sizes** are binary KiB (1 KiB = 1024 B) so the byte rate matches Storage Modeller; the result is displayed in decimal MB/s, with the MiB/s equivalent shown alongside for cross-checking.
+- **Journal buffer multiplies RTT by 2.** The input is labelled "RTT" (already round-trip) and the buffer formula multiplies by 2 again, so it over-sizes the sync buffer roughly 2×. It errs safe (over-provisioned) and the amounts are tiny, but if you want it exact, either treat the input as one-way latency or drop the ×2.
+- **Sensitivity fields are advisory only.** The optional Sequential/Cache-efficiency inputs never change the standard result; they only add a clearly-flagged, ±25%-bounded sensitivity estimate that must be validated against Storage Insights (Section 4, Card 1).
 
 ---
 
 ## 8. Quick reference: every formula in one place
 
-| Result | Formula (as implemented) |
+| Result | Formula (as implemented in v5) |
 |---|---|
 | Read IOPS | `Total IOPS × read%` |
 | Write IOPS | `Total IOPS × (100 − read%)` |
-| Throughput (MB/s) | `(IOPS ÷ 1000) × block KB` |
-| Throughput (GB/s) | `MB/s ÷ 1000` |
-| Usable IOPS ceiling | `peak IOPS × derate%` |
-| IOPS utilisation | `IOPS ÷ usable IOPS × 100` |
+| Read throughput (MB/s) | `read IOPS × read KiB × 1024 ÷ 1,000,000` |
+| Write throughput (MB/s) | `write IOPS × write KiB × 1024 ÷ 1,000,000` |
+| Total throughput (MB/s) | `read throughput + write throughput`  (÷1000 → GB/s; ÷1.048576 → MiB/s) |
+| Mixed-workload saturation | per-model calibrated value (FS9600 1,500,000; FS7600 850,000; FS5600 450,000) |
+| Comfortable ceiling | `saturation × comfort%` |
+| **Core utilisation** | `IOPS ÷ saturation × 100`  (≈ Storage Modeller "System Core %") |
 | Bandwidth utilisation | `GB/s ÷ ceiling GB/s × 100` |
+| **Estimated latency** | `base service time ÷ (1 − u)`  where `u = load ÷ saturation` |
+| Performance verdict bands | `FITS ≤ 60%` · `MARGINAL 60–80%` · `OVER > 80%` (of core/BW, worst-of) |
 | Logical (effective) data | `data today + growth` |
 | Physical flash consumed (info) | `logical ÷ DRR` |
 | Effective needed with headroom | `logical ÷ target%` |
-| Capacity utilisation | `(effective-with-headroom in PBe) ÷ array max PBe × 100` |
+| Capacity utilisation | `(logical ÷ target%) ÷ array max PBe × 100` |
 | Replication mode | `RTT ≤ 1 ms → PBHA sync` · `1–80 ms → PBR async` · `> 80 ms → not supported` |
-| Write rate (MB/s) | `write IOPS × block KB ÷ 1000` |
-| On-wire (after compression) | `write MB/s ÷ stream compression` |
-| On-wire (Gbps) | `on-wire MB/s ÷ 125` |
+| Write rate (MB/s) | `write IOPS × write KiB × 1024 ÷ 1,000,000` |
+| On-wire (after compression) | `write MB/s ÷ stream compression`  ( ÷125 → Gbps ) |
 | Usable link (MB/s) | `link Gbps × 125 × 0.80` |
 | Link utilisation | `on-wire MB/s ÷ usable link × 100` |
 | Sync journal buffer (MB) | `write MB/s × (RTT ms ÷ 1000) × 2` |
@@ -443,10 +457,11 @@ These remain *estimates*. Always confirm current limits on IBM's official *Confi
 | Write cache | `usable memory × 0.15` |
 | Read cache | `usable memory × 0.85` |
 | Memory utilisation | `(write cache + journal buffer) ÷ usable memory × 100` |
-| **Chart: current throughput (GB/s)** | `(IOPS ÷ 1000) × block KB ÷ 1000` |
+| Sensitivity factor (optional) | `clamp(1 + (blended cache hit − 0.5) × 0.4, 0.75, 1.25)`, applied to saturation as a separate estimate |
+| **Chart: current throughput (GB/s)** | transfer-size aware total ÷ 1000 |
 | **Chart: projected IOPS** | `current IOPS × (1 + growth% ÷ 100) ^ years` |
-| **Chart: estimated latency** | `L₀ × (1 + 1.5 × u² ÷ (1 − 0.98u)^1.1)` where `u = load ÷ ceiling`, `L₀` = model baseline ms |
+| **Chart: estimated latency** | `base ÷ (1 − u)` where `u = load ÷ saturation` |
 
 ---
 
-*Estimates for pre-sales planning. Always confirm final performance, capacity, and replication limits with the IBM Configurator and the current IBM Storage Virtualize 9.1.2 configuration-limits documentation before quoting a bill of materials.*
+*Teaching and estimation tool for pre-sales planning — it shows the formulas behind the numbers, and its performance curve is calibrated to IBM Storage Modeller for the FS9600 mixed-workload profile. It is not a substitute for Storage Modeller (authoritative report & graph) or Storage Insights (measured telemetry), and is not court-defensible. Always confirm final performance, capacity, and replication limits with the IBM Configurator and the current Storage Virtualize 9.1.2 configuration-limits documentation before quoting a bill of materials.*
