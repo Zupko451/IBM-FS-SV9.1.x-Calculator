@@ -4,6 +4,8 @@
 *What every number means, what the results are telling you, and how to use them to explain a storage design — written so that someone new to storage sizing can follow it.*
 
 > **What changed in v5 (read this if you used an earlier build).** The performance engine was recalibrated against **IBM Storage Modeller** output. Three things moved materially: (1) the latency curve is now a textbook queueing model instead of an ad-hoc curve; (2) the IOPS "fit" is measured against a realistic **mixed-workload saturation point** rather than a flat derate of the datasheet peak — which lowered the usable-IOPS ceiling roughly 3–4× and made it match IBM's tooling; and (3) throughput now sizes **reads and writes separately** by transfer size. Because these change the output numbers, **v5 exports should not be mixed with earlier ones.** Full detail in Section 7.
+>
+> **Latest v5 update.** A peer double-check of the replication numbers against SG24-8569 found: PBR/PBHA supports FC as well as IP partnerships (Card 3 now says so explicitly); the Redbook's ~10% change-volume capacity guideline wasn't wired into the Capacity card — it now is, applied automatically whenever PBR async is active; and Card 1's core-utilisation figure was found to reflect host I/O only, with no source available to quantify replication's own CPU overhead — it now carries a standing disclaimer saying so. The PDF export's summary header, which had been missed in the original v5 recalibration, was also brought in line with the on-screen cards. See Section 7.3.
 
 ---
 
@@ -45,7 +47,7 @@ Every result card shows a colored verdict so you can read it at a glance:
 
 ### Choosing your model
 
-At the top of the input panel is a **FlashSystem model** selector covering the three current-generation arrays: **FS9600** (the flagship), **FS7600** (mid-to-upper enterprise), and **FS5600** (entry-to-midrange). Picking a model loads that array's performance, bandwidth, capacity, and memory ceilings — and, in v5, its calibrated **saturation point** and **base latency** — so every result and every chart zone is measured against the right hardware. The exact ceilings are in Section 7.3. The replication behaviour (sync/async RTT limits) and the mixed-workload model are Storage Virtualize software characteristics shared across all three (and shared with SVC SV3 nodes, which run the same software). If you're sizing a multi-array **FlashSystem Grid**, override the capacity ceiling with the grid figure shown for that model.
+At the top of the input panel is a **FlashSystem model** selector covering the three current-generation arrays: **FS9600** (the flagship), **FS7600** (mid-to-upper enterprise), and **FS5600** (entry-to-midrange). Picking a model loads that array's performance, bandwidth, capacity, and memory ceilings — and, in v5, its calibrated **saturation point** and **base latency** — so every result and every chart zone is measured against the right hardware. The exact ceilings are in Section 7.4. The replication behaviour (sync/async RTT limits) and the mixed-workload model are Storage Virtualize software characteristics shared across all three (and shared with SVC SV3 nodes, which run the same software). If you're sizing a multi-array **FlashSystem Grid**, override the capacity ceiling with the grid figure shown for that model.
 
 ---
 
@@ -145,6 +147,8 @@ This is a genuine v5 correction: the old build applied one flat 8 KB block to ev
 
 The verdict reflects **whichever of the two is higher** (the binding constraint), against the IBM 60% / 80% bands. At 10% core and 1.9% bandwidth, the sample is **FITS** (green).
 
+> **What this does not include: replication CPU overhead.** Core utilisation and latency here reflect **host I/O only**. Active PBR/PBHA replication — change tracking, journaling, cycling snapshots — adds its own controller CPU load on top of that, and neither IBM's published Redbook material nor the Storage Modeller reference this card is calibrated against quantifies that overhead separately (the Storage Modeller workload profile used for calibration describes host I/O characteristics only, with no replication component). If replication is active for this workload, treat Card 1's utilisation as a **floor, not the full picture**, and validate the combined load against Storage Insights telemetry on a comparable running system before treating it as a commitment. The tool surfaces this as a standing caveat under Card 1 rather than guessing at a number with no source to back it.
+
 **Optional — Workload sensitivity.** A collapsed, optional section lets you enter **Sequential I/O %**, **Cache efficiency – random %**, and **Cache efficiency – sequential %**. Leave them blank and they do nothing — the standard result is unchanged. If you populate the cache-efficiency fields, the tool adds a *separate, clearly-flagged* "sensitivity-adjusted saturation" line showing how much the ceiling would move for a more- or less-cache-friendly workload (bounded to ±25% so it can't masquerade as hardware-grade precision). Every appearance carries the caveat that **cache hit rate is emergent and must be validated against Storage Insights** before it informs a commitment. This is a reasoning lever for "how sensitive is my sizing to a number I haven't measured yet," not a prediction.
 
 **Helper notes you may see:**
@@ -172,14 +176,20 @@ This uses *your* DRR and helps you understand NAND burn and endurance headroom. 
 **Effective needed with headroom.** Because you never fill to 100%:
 > `Logical ÷ target%` → 250 ÷ 80% = **312.5 TB = 0.313 PBe**
 
+**Change-volume reserve — added automatically when PBR async is active.** If you've entered an RTT on Card 3 that places the workload in the PBR async band (sync limit < RTT ≤ async limit), Card 2 adds a **10% change-volume reserve** on top of your logical data before computing the headroom figure — per SG24-8569's guideline that *"change volumes can use up to 10% of the storage capacity on both the production and recovery systems."* For the sample (250 TB logical, RTT 12 ms):
+> Change volume reserve = `250 TB × 10%` = **25 TB**
+> Effective needed with headroom = `(250 + 25) ÷ 80%` = **343.75 TB = 0.344 PBe**
+
+This reserve is sized on **this** array; the tool also notes that the *same* 25 TB must be reserved on the recovery system, which isn't separately modeled here — size it there too. If RTT is left blank, Card 2 has no way to know whether replication is in play, so the reserve is **not** applied, and a small nudge tip reminds you to enter RTT on Card 3 if this data will be PBR-protected. The reserve percentage is overridable in Advanced (`Change volume reserve`, default 10%). It does not apply in PBHA sync mode or when RTT exceeds the async limit — the 10% guideline is specific to async PBR's change-volume mechanism (used in cycling, and always during resync).
+
 **Array fit.** Compared against the array's **effective** capacity ceiling:
-> Capacity utilisation = `(logical ÷ target%) ÷ effective-capacity` → 0.313 ÷ 11.8 PBe ≈ **2.6%**
+> Capacity utilisation = `effective-needed-with-headroom ÷ effective-capacity` → 0.344 ÷ 11.8 PBe ≈ **2.9%**
 
 Green means it fits comfortably; red means you need a larger model or a Grid.
 
 > **Why effective-vs-effective?** Effective capacity already accounts for data reduction, so the honest comparison is logical-data against effective-capacity (both post-reduction terms). The 11.8 PBe figure assumes a reference reduction ratio — if your data reduces better or worse, realised effective capacity scales accordingly. A single FS9600 enclosure tops out near 11.8 PBe; a 32-system grid scales to roughly 377 PBe.
 
-**How this justifies the sizing:** "250 TB is ~2.6% of the array's ~11.8 PBe effective capacity even after growth and headroom, occupying only ~71 TB of physical flash — capacity is not a constraint, with substantial room to grow."
+**How this justifies the sizing:** "250 TB is ~2.9% of the array's ~11.8 PBe effective capacity even after growth, headroom, and the change-volume reserve for replication, occupying only ~71 TB of physical flash — capacity is not a constraint, with substantial room to grow."
 
 ---
 
@@ -193,6 +203,8 @@ Green means it fits comfortably; red means you need a larger model or a Grid.
 - **> 80 ms → not supported** — beyond the documented RTT limit for async PBR; the card turns red.
 
 Both thresholds are overridable in Advanced if IBM's guidance changes.
+
+> **Transport: this card assumes an IP WAN link — but PBR/PBHA is not IP-only.** SG24-8569 confirms replication runs over *"Fibre Channel and IP partnerships."* For genuine WAN-distance DR (what Card 3 models via RTT), a shared IP WAN link is the common real-world case, and that's what the Gbps-to-MB/s math here assumes. If a design instead uses an FC partnership (FCIP over DWDM/dark fiber) or the short-distance RDMA-over-Ethernet transport (metro-only, no compression support), the link-capacity arithmetic still applies, but the **compression assumption is IP/FCIP-specific** — set stream compression to 1:1 if the real transport doesn't compress on the wire.
 
 **Replication bandwidth (v5: sized on write transfer size).** Replication carries **writes only**, and v5 sizes them at the *write* block size:
 > Write rate = `write IOPS × write KiB` → 45,000 × 16 KiB ≈ **737 MB/s**
@@ -377,14 +389,26 @@ The headline change. The tool was validated against an actual **IBM Storage Mode
 - The FS7600 tab in the source export used a *different* cache-hit assumption (75%) than FS9600 (~51%) — a different workload, not just different hardware — so FS9600 is the anchor and the others are scaled from it rather than read directly.
 - The queueing model is slightly **optimistic** (a few percent low on latency) in the 40–60% range. It's disclaimed, and it's a rounding error next to the old 3–4× ceiling error.
 
-### 7.2 Capacity card uses effective-vs-effective
+### 7.2 Capacity card uses effective-vs-effective, plus a change-volume reserve when replicating
 
-The fit verdict compares your **logical (effective) data plus headroom** against the array's **effective** capacity (both post-reduction terms). Your DRR drives the informational "physical flash consumed" line.
-> Capacity utilisation = `(logical ÷ target%) ÷ (effective capacity in TB) × 100`
+The fit verdict compares your **logical (effective) data, plus headroom, plus a change-volume reserve when applicable** against the array's **effective** capacity (all post-reduction terms). Your DRR drives the informational "physical flash consumed" line.
+> Capacity utilisation = `((logical + change-volume reserve) ÷ target%) ÷ (effective capacity in TB) × 100`
+
+The change-volume reserve (default 10%, per SG24-8569, overridable in Advanced) is added automatically only when RTT places the workload in the PBR async band — see Section 7.3 for the full rationale.
 
 The effective-capacity figure assumes a reference DRR; if your data reduces better or worse, realised effective capacity scales with it — so treat the headline percentage as "good if your data reduces about as expected," and use the physical-flash line plus your measured DRR for a closer look.
 
-### 7.3 Array ceilings — current-generation models
+### 7.3 Replication transport, change-volume capacity, and the CPU-overhead gap (this update)
+
+Three items came out of a peer double-check of the replication-side numbers against SG24-8569:
+
+1. **Transport corrected.** The tool's Card 3 assumes a shared IP WAN link, which is the common case for distance DR — but PBR/PBHA formally supports **both Fibre Channel and IP partnerships**. This is now called out directly on Card 3 and in Section 4 (Card 3) of this README rather than implied.
+2. **Change-volume capacity reserve — now wired into Card 2 (fixed, was a gap).** SG24-8569 states plainly that *"change volumes can use up to 10% of the storage capacity on both the production and recovery systems."* Earlier builds computed capacity fit from logical data alone with no automatic reserve. Card 2 now adds this reserve automatically whenever RTT (entered on Card 3) places the workload in the PBR async band — silently absent when RTT is unset or when the mode is PBHA sync or unsupported-distance, and overridable in Advanced (default 10%). Both the on-screen card and both exports (`.xlsx` and the PDF summary header) now agree on this figure. See Section 4, Card 2 for the worked example (250 TB logical → +25 TB reserve → 2.9% utilisation, up from 2.6%).
+3. **Replication CPU/core overhead — flagged, not modeled (honest gap, still open).** Card 1's core-utilisation figure is calibrated to a Storage Modeller reference run that describes a **host I/O workload only** — nothing in that profile indicates active replication. Neither Redbook quantifies how much controller CPU active PBR/PBHA replication (change tracking, journaling, cycling snapshots) adds on top of host I/O. Cards 1 and 3 are computed **independently** — an active replication stream does not feed back into Card 1's utilisation number. Rather than fabricate a coefficient with no source behind it, Card 1 now carries a standing disclaimer stating this plainly: treat its utilisation as a **floor**, not the full picture, when replication is active, and validate the combined load against Storage Insights telemetry on a comparable system. This remains open for a future update if a quantified source turns up.
+
+A related fix caught in the same pass: the PDF export's summary header (`exportPdf`) had been missed during the v5 recalibration and was still running the pre-v5 flat-derate performance formula and flat-block replication/memory math. It's now aligned with the on-screen cards and the `.xlsx` export — all three now agree.
+
+### 7.4 Array ceilings — current-generation models
 
 The model selector loads the single-enclosure ceilings below; override any of them in Advanced.
 
@@ -410,14 +434,14 @@ Notes:
 
 Always confirm current limits on IBM's official *Configuration limits* page for v9.1.x and in the IBM Configurator before quoting a bill of materials.
 
-### 7.4 Synchronous/asynchronous RTT bands
+### 7.5 Synchronous/asynchronous RTT bands
 
 Three correct bands, both thresholds overridable in Advanced:
 - **≤ 1 ms → PBHA synchronous** (RPO 0) — sub-millisecond ideal, because the application waits for the far site on every write.
 - **1 ms to 80 ms → PBR asynchronous** — 80 ms is IBM's documented upper RTT limit for async PBR.
 - **> 80 ms → not supported** — flagged rather than silently sized.
 
-### 7.5 Fixes and remaining minor notes
+### 7.6 Fixes and remaining minor notes
 
 - **Excel export is repaired (v5).** The generated `.xlsx` previously had a malformed zip central directory (a missing "last-modified date" field) that strict readers — openpyxl, Google Sheets, automated pipelines — rejected, even though Excel/LibreOffice opened it via a lenient fallback. This is fixed; the export now opens cleanly everywhere.
 - **Export chart artifact fixed (v5).** The Growth Projection series had an off-by-one range that appended a phantom `(0,0)` point, producing a "boomerang" sweep to the origin. The range is corrected and the projection series draw as straight year-to-year segments.
@@ -445,8 +469,9 @@ Three correct bands, both thresholds overridable in Advanced:
 | Performance verdict bands | `FITS ≤ 60%` · `MARGINAL 60–80%` · `OVER > 80%` (of core/BW, worst-of) |
 | Logical (effective) data | `data today + growth` |
 | Physical flash consumed (info) | `logical ÷ DRR` |
-| Effective needed with headroom | `logical ÷ target%` |
-| Capacity utilisation | `(logical ÷ target%) ÷ array max PBe × 100` |
+| Change-volume reserve (if PBR async active) | `logical × reserve% (default 10%)` — this system; same amount also needed on recovery |
+| Effective needed with headroom | `(logical + change-volume reserve) ÷ target%` |
+| Capacity utilisation | `(logical + change-volume reserve) ÷ target% ÷ array max PBe × 100` |
 | Replication mode | `RTT ≤ 1 ms → PBHA sync` · `1–80 ms → PBR async` · `> 80 ms → not supported` |
 | Write rate (MB/s) | `write IOPS × write KiB × 1024 ÷ 1,000,000` |
 | On-wire (after compression) | `write MB/s ÷ stream compression`  ( ÷125 → Gbps ) |
