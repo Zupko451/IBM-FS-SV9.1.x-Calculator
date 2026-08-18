@@ -1,0 +1,2555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>IBM FlashSystem — SV 9.1.2 Sizing</title>
+<style>
+/* ─── design tokens ─────────────────────────────── */
+:root{
+  --navy:#0b2545; --navy2:#163966; --navy3:#1e4b80;
+  --cyan:#00b4d8; --cyan-dim:rgba(0,180,216,.13);
+  --ink:#0d1b2a; --ink2:#1e3a5f;
+  --muted:#64748b; --faint:#94a3b8;
+  --line:#e2e8f0; --card:#f8fafc; --bg:#eef2f7; --white:#fff;
+  --green:#059669; --green-bg:#ecfdf5; --green-line:#a7f3d0;
+  --yellow:#FFD800; --yellow-bg:#FFFBE6; --yellow-line:#FFD800;
+  --red:#dc2626;   --red-bg:#fef2f2;   --red-line:#fecaca;
+  --purple:#7c3aed; --purple-bg:#f5f3ff; --purple-line:#ddd6fe;
+  --blue:#2563eb;  --blue-bg:#eff6ff;  --blue-line:#bfdbfe;
+  --orange:#ea580c; --orange-bg:#fff7ed; --orange-line:#fed7aa;
+  --radius:10px; --radius-sm:7px;
+  --shadow:0 1px 3px rgba(0,0,0,.07),0 4px 14px rgba(0,0,0,.06);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.06);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  background:var(--bg);color:var(--ink);line-height:1.5;min-height:100vh;
+  padding:16px 12px 56px;font-size:14px}
+.wrap{max-width:1280px;margin:0 auto}
+
+/* ─── header ── */
+header{
+  background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 55%,var(--navy3) 100%);
+  border-radius:var(--radius);padding:18px 22px;margin-bottom:18px;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.logo{width:38px;height:38px;background:var(--cyan);border-radius:9px;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.logo svg{width:20px;height:20px;fill:#fff}
+.hdr-text{flex:1;min-width:0}
+.hdr-text h1{font-size:16px;font-weight:700;color:#fff;line-height:1.3}
+.hdr-text p{font-size:11.5px;color:#94b3cc;margin-top:3px}
+.hdr-btns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn-ghost{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);
+  color:#d1e8f5;border-radius:6px;padding:6px 13px;font-size:12.5px;font-weight:500;cursor:pointer}
+.btn-ghost:hover{background:rgba(255,255,255,.16)}
+.btn-export{background:rgba(255,255,255,.08);border:1px solid rgba(0,180,216,.45);
+  color:#a8dff7;border-radius:6px;padding:6px 13px;font-size:12.5px;font-weight:500;cursor:pointer;
+  display:flex;align-items:center;gap:5px}
+.btn-export:hover{background:rgba(0,180,216,.18)}
+.btn-export svg{width:13px;height:13px;fill:currentColor;flex-shrink:0}
+.btn-cta{background:var(--cyan);border:none;color:var(--navy);
+  border-radius:6px;padding:6px 13px;font-size:12.5px;font-weight:700;cursor:pointer}
+.btn-cta:hover{opacity:.88}
+
+/* ─── legend strip ── */
+.legend{
+  display:flex;gap:16px;flex-wrap:wrap;align-items:center;
+  background:var(--white);border:1px solid var(--line);border-radius:var(--radius);
+  padding:9px 16px;margin-bottom:16px;font-size:11.5px;color:var(--muted)}
+.leg{display:flex;align-items:center;gap:5px}
+.leg-dot{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+.leg-dot.assumed{background:var(--purple)}
+.leg-dot.user{background:var(--cyan)}
+.leg-dot.ok{background:var(--green)}
+.leg-dot.warn{background:var(--yellow)}
+.leg-dot.bad{background:var(--red)}
+
+/* ─── page grid ── */
+.layout{display:grid;grid-template-columns:380px 1fr;gap:18px;align-items:start}
+@media(max-width:960px){.layout{grid-template-columns:1fr}}
+
+/* ─── input panel ── */
+.panel{background:var(--white);border:1px solid var(--line);
+  border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.panel-hdr{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:10px 15px;border-bottom:1px solid var(--line);
+  background:var(--card)}
+.panel-hdr-title{font-size:11px;font-weight:700;letter-spacing:.8px;
+  text-transform:uppercase;color:var(--muted)}
+.assumed-legend{font-size:10px;font-weight:600;color:var(--purple);
+  background:var(--purple-bg);border:1px solid var(--purple-line);
+  border-radius:999px;padding:2px 8px}
+
+.fields{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.grp{font-size:10px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;
+  color:var(--cyan);padding-bottom:2px;border-bottom:1px solid var(--cyan-dim);
+  margin-top:6px}
+.grp:first-child{margin-top:0}
+
+.fld label{display:flex;align-items:baseline;gap:4px;
+  font-size:12px;font-weight:500;color:var(--muted);margin-bottom:4px}
+.fld label .def{font-size:10.5px;font-weight:400;color:var(--faint)}
+.iw{display:flex;align-items:stretch;border:1.5px solid var(--line);
+  border-radius:var(--radius-sm);background:var(--white);overflow:hidden;
+  transition:border-color .15s,box-shadow .15s}
+.iw:focus-within{border-color:var(--cyan);box-shadow:0 0 0 3px var(--cyan-dim)}
+.iw input{flex:1;min-width:0;padding:8px 10px;border:none;background:transparent;
+  font-size:14px;font-variant-numeric:tabular-nums;color:var(--ink);outline:none}
+.iw input::placeholder{color:#c8d4e0}
+.iw select{flex:1;min-width:0;padding:8px 10px;border:none;background:transparent;
+  font-size:14px;color:var(--ink);outline:none;cursor:pointer;
+  -webkit-appearance:none;appearance:none}
+/* auto-filled (linked) input — shows value is derived */
+.iw input.linked{background:var(--purple-bg);color:var(--purple);font-weight:600}
+.unit{padding:0 10px;font-size:11.5px;font-weight:500;color:var(--muted);
+  background:var(--card);border-left:1.5px solid var(--line);
+  display:flex;align-items:center;white-space:nowrap;min-height:36px;flex-shrink:0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
+
+/* linked read/write % row */
+.rw-row{display:grid;grid-template-columns:1fr auto 1fr;gap:0;align-items:center;
+  border:1.5px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;
+  transition:border-color .15s,box-shadow .15s}
+.rw-row:focus-within{border-color:var(--cyan);box-shadow:0 0 0 3px var(--cyan-dim)}
+.rw-row input{flex:1;min-width:0;padding:8px 10px;border:none;background:transparent;
+  font-size:14px;font-variant-numeric:tabular-nums;color:var(--ink);outline:none;width:100%}
+.rw-row input.linked{background:var(--purple-bg);color:var(--purple);font-weight:600}
+.rw-divider{padding:0 8px;background:var(--card);border-left:1.5px solid var(--line);
+  border-right:1.5px solid var(--line);font-size:11px;color:var(--muted);
+  display:flex;align-items:center;height:100%;white-space:nowrap;gap:2px;min-height:36px}
+.rw-unit{font-size:11.5px;font-weight:500;color:var(--muted);background:var(--card);
+  display:flex;align-items:center;padding:0 8px;white-space:nowrap}
+.rw-labels{display:grid;grid-template-columns:1fr auto 1fr;gap:0;margin-bottom:3px}
+.rw-labels span{font-size:12px;font-weight:500;color:var(--muted)}
+.rw-labels span:last-child{text-align:right}
+
+details.adv{border-top:1px solid var(--line)}
+details.adv summary{padding:9px 15px;font-size:11.5px;font-weight:500;
+  color:var(--muted);cursor:pointer;user-select:none;
+  display:flex;align-items:center;gap:6px;list-style:none}
+details.adv summary::-webkit-details-marker{display:none}
+/* headroom chart toggle */
+#boxHeadroom>summary::-webkit-details-marker{display:none}
+#boxHeadroom[open]>#headroomArrow,
+#boxHeadroom[open]>summary>#headroomArrow{transform:rotate(90deg)}
+details.adv summary::before{content:'▶';font-size:8px;
+  display:inline-block;transition:transform .15s}
+details.adv[open] summary::before{transform:rotate(90deg)}
+details.adv[open] summary{color:var(--ink);font-weight:600}
+.adv-body{padding:0 15px 13px;display:flex;flex-direction:column;gap:9px}
+
+/* ─── results column ── */
+.results{display:flex;flex-direction:column;gap:14px}
+
+.res-card{background:var(--white);border:1px solid var(--line);
+  border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.res-card.ok  {border-top:3px solid var(--green)}
+.res-card.warn{border-top:3px solid var(--yellow)}
+.res-card.bad {border-top:3px solid var(--red)}
+.res-card.idle{border-top:3px solid var(--line)}
+.res-card.info{border-top:3px solid var(--blue)}
+
+.res-hdr{display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+  padding:10px 15px 9px;border-bottom:1px solid var(--line)}
+.badge{font-size:9.5px;font-weight:700;letter-spacing:.5px;
+  color:#fff;background:var(--navy);border-radius:4px;padding:2px 7px;flex-shrink:0}
+.res-hdr h3{font-size:13.5px;font-weight:700;color:var(--ink);flex:1;min-width:0}
+.verdict{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;
+  white-space:nowrap;flex-shrink:0;letter-spacing:.3px}
+.verdict.ok  {background:var(--green-bg);color:var(--green);border:1px solid var(--green-line)}
+.verdict.warn{background:var(--yellow-bg);color:var(--yellow);border:1px solid var(--yellow-line)}
+.verdict.bad {background:var(--red-bg);color:var(--red);border:1px solid var(--red-line)}
+.verdict.info{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-line)}
+.verdict.partial{background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-line)}
+
+/* idle placeholder */
+.idle-msg{padding:20px 18px;font-size:12.5px;color:var(--muted);
+  text-align:center;font-style:italic}
+
+/* ─── metric rows ── */
+.mrow{padding:7px 15px;border-bottom:1px solid var(--line)}
+.mrow:last-child{border-bottom:none}
+.mtop{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.mlbl{font-size:12px;color:var(--muted);line-height:1.4;flex:1;min-width:0}
+.mval{font-size:14.5px;font-weight:700;font-variant-numeric:tabular-nums;
+  color:var(--ink);text-align:right;white-space:nowrap;flex-shrink:0}
+.mval.big{font-size:17px;color:var(--navy2)}
+.mval.ok  {color:var(--green)}
+.mval.warn{color:var(--yellow)}
+.mval.bad {color:var(--red)}
+
+.mform{margin-top:3px;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  font-size:10.5px;color:#7a8fa8;background:var(--card);
+  border-radius:5px;padding:4px 8px;white-space:pre-wrap;word-break:break-all;
+  border:1px solid var(--line);line-height:1.5}
+
+/* assumed tag */
+.atag{display:inline-block;margin-left:5px;
+  font-size:9.5px;font-weight:600;
+  background:var(--purple-bg);color:var(--purple);
+  border:1px solid var(--purple-line);border-radius:3px;padding:0 4px;
+  vertical-align:middle;white-space:nowrap}
+
+/* section divider inside result cards */
+.res-section{padding:7px 15px 4px;background:var(--card);
+  border-bottom:1px solid var(--line);
+  font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+
+/* progress bar */
+.pbar-wrap{padding:4px 15px 10px}
+.pbar-track{height:8px;background:var(--line);border-radius:99px;overflow:hidden}
+.pbar-fill{height:100%;border-radius:99px;transition:width .3s}
+.pbar-fill.ok  {background:var(--green)}
+.pbar-fill.warn{background:var(--yellow)}
+.pbar-fill.bad {background:var(--red)}
+
+/* mode badge */
+.mode-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:5px 11px;border-radius:6px;font-size:12px;font-weight:700;
+  margin:8px 15px 4px}
+.mode-badge.sync{background:var(--green-bg);color:var(--green);border:1px solid var(--green-line)}
+.mode-badge.async{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-line)}
+.mode-badge.async-cycle{background:var(--yellow-bg);color:var(--yellow);border:1px solid var(--yellow-line)}
+.mode-badge::before{content:'●';font-size:8px}
+
+/* tip note */
+.tip-note{margin:0 15px 10px;padding:7px 10px;background:var(--blue-bg);
+  border-left:3px solid var(--blue);border-radius:0 5px 5px 0;
+  font-size:11.5px;color:var(--ink2);line-height:1.5}
+.tip-note.warn{background:var(--yellow-bg);border-left-color:var(--yellow)}
+.tip-note.ok  {background:var(--green-bg);border-left-color:var(--green)}
+
+/* ─── tips bar ── */
+.tips{background:var(--navy);border-radius:var(--radius);
+  padding:12px 16px;margin-top:16px;display:flex;flex-direction:column;gap:0}
+.tip{padding:6px 0;border-bottom:1px solid #1d3f60;font-size:11.5px;color:#94b3cc;line-height:1.5}
+.tip:last-child{border-bottom:none}
+.tip b{color:var(--cyan);font-weight:600}
+
+/* ─── Export bar ── */
+.export-bar{
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  background:var(--white);border:1px solid var(--line);border-radius:var(--radius);
+  padding:10px 16px;margin-top:16px;box-shadow:var(--shadow-sm)}
+.export-bar-label{font-size:11.5px;font-weight:600;color:var(--muted);margin-right:2px}
+.btn-exp{
+  display:inline-flex;align-items:center;gap:6px;
+  border-radius:6px;padding:7px 14px;font-size:12.5px;font-weight:600;cursor:pointer;
+  border:1.5px solid;transition:opacity .15s}
+.btn-exp:hover{opacity:.82}
+.btn-exp.xlsx{background:#e8f5e9;color:#1b5e20;border-color:#a5d6a7}
+.btn-exp.pdf {background:#e3f2fd;color:#0d47a1;border-color:#90caf9}
+.btn-exp.png {background:var(--orange-bg);color:var(--orange);border-color:var(--orange-line)}
+.btn-exp svg{width:14px;height:14px;fill:currentColor;flex-shrink:0}
+
+/* footer */
+.foot{margin-top:12px;font-size:11px;color:var(--muted);text-align:center;line-height:1.8}
+.made-with{margin-top:18px;padding-top:10px;border-top:1px solid var(--line);
+  text-align:center;font-size:11px;color:var(--muted)}
+
+/* ─── Print / PDF styles ── */
+@media print{
+  body{background:#fff;padding:0;font-size:12px}
+  .wrap{max-width:100%}
+  header{background:#0b2545!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;
+    border-radius:0;padding:14px 18px}
+  .hdr-btns,.export-bar,.tips,.legend,.chart-vis-row,
+  .perf-inputs,.perf-sum-note,.storm-panel{display:none!important}
+  .layout{grid-template-columns:340px 1fr;gap:14px}
+  .panel{box-shadow:none}
+  .res-card{page-break-inside:avoid;box-shadow:none}
+  .perf-section{page-break-before:always;box-shadow:none}
+  .perf-section>summary{display:flex;pointer-events:none}
+  .perf-section[open]>summary{border-bottom-color:var(--line)}
+  details.adv{display:none}
+  .foot,.made-with{display:block}
+  .charts-row{grid-template-columns:1fr 1fr}
+  .print-proposal-header{display:block!important}
+  .chart-zoom-wrap{overflow:visible!important}
+  .chart-zoom-wrap svg{transform:none!important;cursor:default!important}
+}
+.print-proposal-header{display:none;
+  background:#0b2545;color:#fff;padding:18px 22px;margin-bottom:16px;
+  border-radius:var(--radius);font-size:13px;line-height:1.6}
+.print-proposal-header h2{font-size:17px;font-weight:700;margin-bottom:4px;color:#fff}
+.print-proposal-header .pph-sub{color:#94b3cc;font-size:11.5px}
+.print-proposal-header .pph-meta{margin-top:10px;display:flex;gap:24px;flex-wrap:wrap}
+.print-proposal-header .pph-kv{display:flex;flex-direction:column;gap:1px}
+.print-proposal-header .pph-k{font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;color:#7aacc8;font-weight:600}
+.print-proposal-header .pph-v{font-size:13px;font-weight:700;color:#fff}
+
+/* ─── Mobile / iPad responsive ── */
+@media(max-width:600px){
+  body{padding:10px 6px 40px;font-size:15px}
+  header{padding:14px 14px;gap:10px}
+  .hdr-text h1{font-size:14px}
+  .hdr-text p{font-size:10.5px}
+  .hdr-btns{width:100%;justify-content:flex-end}
+  .legend{padding:8px 12px;gap:10px;font-size:10.5px}
+  .panel-hdr{padding:9px 12px}
+  .fields{padding:12px 12px;gap:12px}
+  .two{grid-template-columns:1fr}
+  .three{grid-template-columns:1fr}
+  .iw input,.rw-row input,.iw select{font-size:16px;padding:10px 10px}
+  .unit{font-size:11px;padding:0 8px;min-height:42px}
+  .rw-divider{min-height:42px}
+  .btn-ghost,.btn-cta{padding:8px 14px;font-size:13px}
+  .res-hdr{padding:10px 12px 9px}
+  .res-hdr h3{font-size:12.5px}
+  .mrow{padding:8px 12px}
+  .mval{font-size:13.5px}
+  .mval.big{font-size:15px}
+  .mform{font-size:10px;word-break:break-all}
+  .tips{padding:10px 12px}
+  .tip{font-size:10.5px}
+  .mode-badge{margin:8px 12px 4px}
+  .tip-note{margin:0 12px 10px}
+  .pbar-wrap{padding:4px 12px 10px}
+  .adv-body{padding:0 12px 13px}
+  details.adv summary{padding:9px 12px}
+}
+
+/* iPad portrait & mid-size tablets */
+@media(min-width:601px) and (max-width:960px){
+  .iw input,.rw-row input,.iw select{font-size:16px}
+  .fields{padding:14px 14px}
+}
+
+/* iOS: prevent zoom on input focus (requires font-size >= 16px on inputs) */
+@supports(-webkit-touch-callout:none){
+  .iw input,.rw-row input,.iw select{font-size:16px}
+}
+
+/* ─── Performance Scaling Charts section ─────────────────── */
+.perf-section{
+  background:var(--white);border:1px solid var(--line);
+  border-radius:var(--radius);box-shadow:var(--shadow);
+  margin-top:18px;overflow:hidden}
+.perf-section>summary{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:11px 16px;cursor:pointer;user-select:none;
+  background:var(--card);border-bottom:1px solid transparent;
+  list-style:none}
+.perf-section>summary::-webkit-details-marker{display:none}
+.perf-section[open]>summary{border-bottom-color:var(--line)}
+.perf-section>summary::before{
+  content:'▶';font-size:8px;color:var(--cyan);
+  display:inline-block;transition:transform .15s;flex-shrink:0}
+.perf-section[open]>summary::before{transform:rotate(90deg)}
+.perf-sum-title{font-size:13px;font-weight:700;color:var(--ink)}
+.perf-sum-note{font-size:11.5px;color:var(--muted);flex:1;min-width:0}
+.perf-body{padding:14px 16px;display:flex;flex-direction:column;gap:14px}
+.perf-inputs{display:grid;grid-template-columns:260px 200px;gap:12px;align-items:end}
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.charts-row-triple{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.chart-box{background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius-sm);padding:10px 6px 6px;overflow:hidden;position:relative}
+.chart-box-title-bar{display:flex;align-items:center;justify-content:space-between;
+  padding:0 4px 6px;gap:8px}
+.chart-box-title{font-size:11.5px;font-weight:700;color:var(--ink2)}
+/* axis range inputs */
+.chart-axis-row{
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+  padding:6px 4px 2px;border-top:1px solid var(--line);margin-top:4px}
+.chart-axis-row label{font-size:10.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+.chart-axis-input{
+  width:88px;padding:3px 6px;font-size:12px;font-variant-numeric:tabular-nums;
+  border:1.5px solid var(--line);border-radius:5px;outline:none;
+  background:var(--white);color:var(--ink);transition:border-color .15s}
+.chart-axis-input:focus{border-color:var(--cyan)}
+.chart-axis-input::placeholder{color:#c8d4e0}
+.chart-axis-reset{font-size:10.5px;padding:3px 8px;border-radius:5px;
+  border:1px solid var(--line);background:var(--card);color:var(--muted);
+  cursor:pointer;white-space:nowrap}
+.chart-axis-reset:hover{background:var(--line)}
+.chart-legend-row{
+  display:flex;flex-wrap:wrap;gap:8px 18px;
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius-sm);padding:9px 14px;
+  font-size:11px;color:var(--muted)}
+.chart-leg-item{display:flex;align-items:center;gap:5px}
+.clc{display:inline-block;width:22px;height:3px;border-radius:2px;flex-shrink:0}
+.clf{display:inline-block;width:14px;height:10px;border-radius:2px;
+  flex-shrink:0;border:1px solid transparent}
+.clf.green{background:rgba(5,150,105,.14);border-color:rgba(5,150,105,.35)}
+.clf.yellow{background:rgba(255,216,0,.12);border-color:rgba(255,216,0,.45)}
+.clf.red{background:rgba(252,196,109,.18);border-color:rgba(252,196,109,.6)}
+.clf.gray{background:rgba(100,116,139,.1);border-color:rgba(100,116,139,.3)}
+.cldot{font-size:13px;font-weight:700;width:16px;text-align:center;
+  display:inline-block;color:var(--muted)}
+/* ── chart visibility toggle checkboxes ── */
+.chart-vis-row{
+  display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius-sm);padding:8px 14px}
+.cvis{display:flex;align-items:center;gap:6px;cursor:pointer;
+  font-size:11.5px;font-weight:500;color:var(--ink);user-select:none;
+  padding:3px 8px 3px 6px;border-radius:6px;border:1.5px solid var(--line);
+  background:var(--white);transition:border-color .15s,background .15s}
+.cvis:hover{background:#f0f4f8}
+.cvis input[type=checkbox]{width:14px;height:14px;cursor:pointer;accent-color:var(--cyan);flex-shrink:0}
+.cvis.dimmed{opacity:.4}
+.cvis-swatch{display:inline-block;width:20px;height:3px;border-radius:2px;flex-shrink:0}
+.cvis-divider{width:1px;height:22px;background:var(--line);flex-shrink:0}
+.chart-vis-label{font-size:10px;font-weight:700;letter-spacing:.7px;
+  text-transform:uppercase;color:var(--muted);margin-right:2px}
+
+/* ─── Zoom/pan wrapper ── */
+.chart-zoom-wrap{
+  overflow:hidden;cursor:grab;user-select:none;border-radius:4px;
+  position:relative;touch-action:none}
+.chart-zoom-wrap:active{cursor:grabbing}
+.chart-zoom-wrap svg{transform-origin:0 0;display:block;width:100%;height:auto}
+/* zoom hint */
+.zoom-hint{font-size:9.5px;color:var(--faint);text-align:right;
+  padding:2px 4px 0;font-style:italic}
+/* zoom controls */
+.zoom-controls{position:absolute;top:6px;right:6px;display:flex;gap:4px;z-index:10}
+.zoom-btn{width:22px;height:22px;border-radius:4px;border:1px solid var(--line);
+  background:rgba(255,255,255,.92);cursor:pointer;font-size:13px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;color:var(--muted);
+  transition:background .12s}
+.zoom-btn:hover{background:var(--white);color:var(--ink)}
+
+/* ─── StorM Import Panel ── */
+.storm-panel{
+  background:var(--white);border:1.5px solid var(--orange-line);
+  border-radius:var(--radius);box-shadow:var(--shadow-sm);overflow:hidden}
+.storm-hdr{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:10px 15px;background:var(--orange-bg);border-bottom:1.5px solid var(--orange-line)}
+.storm-badge{font-size:9.5px;font-weight:700;letter-spacing:.5px;
+  color:#fff;background:var(--orange);border-radius:4px;padding:2px 7px;flex-shrink:0}
+.storm-hdr h3{font-size:13px;font-weight:700;color:var(--orange);flex:1;min-width:0}
+.storm-body{padding:13px 15px;display:flex;flex-direction:column;gap:12px}
+
+/* drop zone */
+.drop-zone{
+  border:2px dashed var(--orange-line);border-radius:var(--radius-sm);
+  padding:18px 14px;text-align:center;cursor:pointer;
+  background:var(--orange-bg);transition:border-color .15s,background .15s;
+  font-size:12.5px;color:var(--orange)}
+.drop-zone:hover,.drop-zone.dragover{border-color:var(--orange);background:#fff7ed}
+.drop-zone input[type=file]{display:none}
+.drop-zone svg{width:26px;height:26px;fill:var(--orange);margin-bottom:6px;display:block;margin-left:auto;margin-right:auto}
+.drop-zone-hint{font-size:11px;color:var(--faint);margin-top:3px}
+
+/* StorM results table */
+.storm-table{width:100%;border-collapse:collapse;font-size:11.5px}
+.storm-table th{background:var(--orange);color:#fff;font-weight:700;
+  padding:5px 8px;text-align:left;font-size:10.5px;letter-spacing:.4px}
+.storm-table td{padding:5px 8px;border-bottom:1px solid var(--orange-line);
+  font-variant-numeric:tabular-nums;vertical-align:top}
+.storm-table tr:last-child td{border-bottom:none}
+.storm-table tr:nth-child(even) td{background:var(--orange-bg)}
+.storm-status{font-size:11px;font-weight:600;padding:4px 8px;border-radius:5px;
+  display:inline-flex;align-items:center;gap:5px}
+.storm-status.loaded{background:var(--green-bg);color:var(--green);border:1px solid var(--green-line)}
+.storm-status.empty{background:var(--card);color:var(--muted);border:1px solid var(--line)}
+.storm-status.error{background:var(--red-bg);color:var(--red);border:1px solid var(--red-line)}
+.storm-clear-btn{font-size:11px;padding:3px 10px;border-radius:5px;
+  border:1px solid var(--orange-line);background:var(--white);color:var(--orange);
+  cursor:pointer;font-weight:600}
+.storm-clear-btn:hover{background:var(--orange-bg)}
+
+/* ── headroom summary bar in StorM section ── */
+.storm-headroom{
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;
+  padding:10px 0 0}
+.sh-item{background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius-sm);padding:8px 12px}
+.sh-lbl{font-size:10.5px;color:var(--muted);margin-bottom:2px}
+.sh-val{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink)}
+.sh-sub{font-size:10.5px;color:var(--faint);margin-top:1px}
+
+@media(max-width:800px){
+  .charts-row{grid-template-columns:1fr}
+  .charts-row-triple{grid-template-columns:1fr}
+  .storm-headroom{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+  .perf-inputs{grid-template-columns:1fr}
+  .perf-body{padding:12px 12px}
+  .storm-body{padding:10px 12px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ══ HEADER ══ -->
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3 3h18v3H3zM3 10.5h18v3H3zM3 18h18v3H3z"/>
+    </svg>
+  </div>
+  <div class="hdr-text">
+    <h1>IBM FlashSystem — Storage Virtualize 9.1.2 Sizing</h1>
+    <p>Local performance · Capacity · Policy-Based Replication (PBR) · Policy-Based HA (PBHA) · Enter what you know — defaults fill the rest</p>
+  </div>
+  <div class="hdr-btns">
+    <button class="btn-ghost" id="btnClear">Clear</button>
+    <button class="btn-cta"   id="btnSample">Load Sample</button>
+  </div>
+</header>
+
+<div style="margin:12px 0 4px;padding:10px 14px;border-left:4px solid #C2701C;background:#FCF3E9;border-radius:6px;font-size:12.5px;color:#5a4327;line-height:1.5">
+  <b style="color:#8a5a1c">Teaching &amp; estimation tool — it shows the formulas behind the numbers.</b>
+  Not a substitute for IBM Storage Modeller: this is directional and not court-defensible. Validate any committed figure in Storage Modeller (authoritative report &amp; graph) or Storage Insights (measured telemetry). The performance curve is calibrated to Storage Modeller for the FS9600 mixed-workload profile; FS7600 / FS5600 saturation points are scaled estimates — override per model.
+</div>
+
+<!-- ══ LEGEND ══ -->
+<div class="legend">
+  <span style="font-weight:600;color:var(--ink)">Key:</span>
+  <span class="leg"><span class="leg-dot assumed"></span>Purple tag = FS default assumed</span>
+  <span class="leg"><span class="leg-dot ok"></span>Green = within spec</span>
+  <span class="leg"><span class="leg-dot warn"></span>Yellow = marginal (70–90%; Performance card: 60–80%)</span>
+  <span class="leg"><span class="leg-dot bad"></span>Red = over limit</span>
+  <span class="leg"><span class="leg-dot" style="background:var(--orange)"></span>Orange = measured StorM data</span>
+</div>
+
+<div class="layout">
+
+<!-- ══ INPUT PANEL ══ -->
+<div class="panel">
+  <div class="panel-hdr">
+    <span class="panel-hdr-title">Workload inputs</span>
+    <span class="assumed-legend">purple = assumed default</span>
+  </div>
+
+  <div class="fields">
+
+    <div class="grp" style="margin-top:0">System model</div>
+
+    <div class="fld">
+      <label>FlashSystem model <span class="def">sets array ceilings</span></label>
+      <div class="iw"><select id="model">
+        <option value="fs9600">FlashSystem 9600 (5078-A40)</option>
+        <option value="fs7600">FlashSystem 7600 (5075-A30)</option>
+        <option value="fs5600">FlashSystem 5600 (5127-A20)</option>
+      </select></div>
+    </div>
+
+    <div class="grp">Performance</div>
+
+    <div class="fld">
+      <label>Total IOPS</label>
+      <div class="iw"><input id="iops" type="number" min="0" placeholder="e.g. 150 000"/><div class="unit">IOPS</div></div>
+    </div>
+
+    <div class="fld">
+      <div class="rw-labels">
+        <span>Read % <span style="font-size:10.5px;font-weight:400;color:var(--faint)">def 70</span></span>
+        <span></span>
+        <span>Write % <span style="font-size:10.5px;font-weight:400;color:var(--faint)">auto</span></span>
+      </div>
+      <div class="rw-row" id="rwRow">
+        <input id="readpct"  type="number" min="0" max="100" placeholder="70" />
+        <div class="rw-divider">R / W</div>
+        <input id="writepct" type="number" min="0" max="100" placeholder="30" />
+      </div>
+      <div style="font-size:10.5px;color:var(--faint);margin-top:3px">Fill either — the other auto-calculates to 100%</div>
+    </div>
+
+    <div class="two">
+      <div class="fld">
+        <label>Block size <span class="def">def 8 KiB</span></label>
+        <div class="iw"><input id="blkkb" type="number" min="0" step="0.5" placeholder="8"/><div class="unit">KiB</div></div>
+      </div>
+      <div class="fld">
+        <label>Write block <span class="def">if different</span></label>
+        <div class="iw"><input id="wblkkb" type="number" min="0" step="0.5" placeholder="= read"/><div class="unit">KiB</div></div>
+      </div>
+    </div>
+
+    <div class="grp" style="margin-top:4px">Capacity</div>
+
+    <div class="two">
+      <div class="fld">
+        <label>Data today</label>
+        <div class="iw"><input id="capnow" type="number" min="0" placeholder="e.g. 200"/><div class="unit" title="Terabytes">TB</div></div>
+      </div>
+      <div class="fld">
+        <label>Growth <span class="def">optional, TB</span></label>
+        <div class="iw"><input id="capgrow" type="number" min="0" placeholder="0"/><div class="unit" title="Terabytes">TB</div></div>
+      </div>
+    </div>
+
+    <div class="two">
+      <div class="fld">
+        <label>Data reduction <span class="def">def 3:1</span></label>
+        <div class="iw"><input id="reduction" type="number" min="1" step="0.1" placeholder="3"/><div class="unit">: 1</div></div>
+      </div>
+      <div class="fld">
+        <label>Target usage <span class="def">def 80%</span></label>
+        <div class="iw"><input id="target" type="number" min="1" max="100" placeholder="80"/><div class="unit">%</div></div>
+      </div>
+    </div>
+
+    <div class="grp" style="margin-top:4px">Replication (PBR / PBHA)</div>
+
+    <div class="fld">
+      <label>RTT to DR site</label>
+      <div class="iw"><input id="rtt" type="number" min="0" placeholder="e.g. 10"/><div class="unit" title="Round-trip time in milliseconds">ms</div></div>
+    </div>
+
+    <div class="fld">
+      <label>WAN link speed</label>
+      <div class="iw"><input id="linkgbps" type="number" min="0" placeholder="e.g. 10"/><div class="unit" title="Gigabits per second">Gbps</div></div>
+    </div>
+
+    <div class="fld">
+      <label>Stream compression <span class="def">def 2:1</span></label>
+      <div class="iw"><input id="streamcomp" type="number" min="1" step="0.1" placeholder="2"/><div class="unit">: 1</div></div>
+    </div>
+
+  </div><!-- /fields -->
+
+  <!-- Advanced -->
+  <details class="adv" id="advDetails">
+    <summary id="advSummary">FS9600 array ceilings (override)</summary>
+    <div class="adv-body">
+      <div class="two">
+        <div class="fld">
+          <label>4K read-hit peak <span class="def" id="defIops">6 300 000</span></label>
+          <div class="iw"><input id="ceiliops" type="number" placeholder="6300000"/><div class="unit">IOPS</div></div>
+        </div>
+        <div class="fld">
+          <label>Mixed saturation <span class="def" id="defSat">1 500 000</span></label>
+          <div class="iw"><input id="satiops" type="number" placeholder="1500000"/><div class="unit">IOPS</div></div>
+        </div>
+      </div>
+      <div class="fld">
+        <label>Comfort % of saturation <span class="def">60%</span></label>
+        <div class="iw"><input id="derate" type="number" placeholder="60"/><div class="unit">%</div></div>
+      </div>
+      <div class="two">
+        <div class="fld">
+          <label>BW ceiling <span class="def" id="defBw">86 GB/s</span></label>
+          <div class="iw"><input id="ceilbw" type="number" placeholder="86"/><div class="unit">GB/s</div></div>
+        </div>
+        <div class="fld">
+          <label>Max effective cap <span class="def" id="defPbe">11.8 PBe</span></label>
+          <div class="iw"><input id="maxpbe" type="number" placeholder="11.8"/><div class="unit">PBe</div></div>
+        </div>
+      </div>
+      <div class="two">
+        <div class="fld">
+          <label>PBHA sync RTT limit <span class="def">≤ 1 ms</span></label>
+          <div class="iw"><input id="syncrtt" type="number" step="0.1" placeholder="1"/><div class="unit">ms</div></div>
+        </div>
+        <div class="fld">
+          <label>PBR async max RTT <span class="def">80 ms</span></label>
+          <div class="iw"><input id="asyncrtt" type="number" placeholder="80"/><div class="unit">ms</div></div>
+        </div>
+      </div>
+      <div class="fld">
+        <label>Change volume reserve <span class="def">10% (IBM guideline, both systems)</span></label>
+        <div class="iw"><input id="cvpct" type="number" min="0" max="100" placeholder="10"/><div class="unit">%</div></div>
+      </div>
+      <div class="fld">
+        <label>Node memory <span class="def" id="defMem">1 536 GB</span></label>
+        <div class="iw"><input id="nodemem" type="number" placeholder="1536"/><div class="unit">GB</div></div>
+      </div>
+    </div>
+  </details>
+
+  <!-- Workload sensitivity (optional) -->
+  <details class="adv">
+    <summary>Workload sensitivity (optional — requires validation)</summary>
+    <div class="adv-body">
+      <div class="tip-note">💡 Leave blank if unknown. These do not change the standard derate figure above — they add a separate, clearly-flagged estimate of how sensitive that figure is to I/O pattern and cache behavior. Real cache hit rate is emergent, not calculable from workload specs alone — validate any number here against IBM Storage Insights telemetry before using it in a commitment.</div>
+      <div class="fld">
+        <label>Sequential I/O <span class="def">optional</span></label>
+        <div class="iw"><input id="seqpct" type="number" min="0" max="100" placeholder="e.g. 30"/><div class="unit">%</div></div>
+      </div>
+      <div class="two">
+        <div class="fld">
+          <label>Cache efficiency – random <span class="def">optional</span></label>
+          <div class="iw"><input id="cacheeffrand" type="number" min="0" max="100" placeholder="e.g. 50"/><div class="unit">%</div></div>
+        </div>
+        <div class="fld">
+          <label>Cache efficiency – sequential <span class="def">optional</span></label>
+          <div class="iw"><input id="cacheeffseq" type="number" min="0" max="100" placeholder="e.g. 85"/><div class="unit">%</div></div>
+        </div>
+      </div>
+    </div>
+  </details>
+
+</div><!-- /panel -->
+
+<!-- ══ RESULTS ══ -->
+<div class="results">
+
+  <!-- R1: Local Performance -->
+  <div class="res-card idle" id="card1">
+    <div class="res-hdr">
+      <span class="badge">PERF</span>
+      <h3>Local Performance — Can the system handle this workload?</h3>
+      <span class="verdict" id="v1"></span>
+    </div>
+    <div id="b1"><div class="idle-msg">Enter Total IOPS to see performance analysis.</div></div>
+  </div>
+
+  <!-- R2: Capacity -->
+  <div class="res-card idle" id="card2">
+    <div class="res-hdr">
+      <span class="badge">CAP</span>
+      <h3>Capacity — Will data fit with room to grow?</h3>
+      <span class="verdict" id="v2"></span>
+    </div>
+    <div id="b2"><div class="idle-msg">Enter Data today (TB) to see capacity analysis.</div></div>
+  </div>
+
+  <!-- R3: PBR / PBHA Replication -->
+  <div class="res-card idle" id="card3">
+    <div class="res-hdr">
+      <span class="badge">REPL</span>
+      <h3>Policy-Based Replication &amp; HA — Mode, bandwidth &amp; buffer</h3>
+      <span class="verdict" id="v3"></span>
+    </div>
+    <div id="b3"><div class="idle-msg">Enter RTT to DR site to see replication analysis.</div></div>
+  </div>
+
+  <!-- R4: Memory -->
+  <div class="res-card idle" id="card4">
+    <div class="res-hdr">
+      <span class="badge">MEM</span>
+      <h3>System Memory — Cache &amp; PBHA journal impact</h3>
+      <span class="verdict" id="v4"></span>
+    </div>
+    <div id="b4"><div class="idle-msg">Enter IOPS and RTT to see memory analysis.</div></div>
+  </div>
+
+</div><!-- /results -->
+</div><!-- /layout -->
+
+<!-- ══ PERFORMANCE SCALING & MODELLING ════════════════════════ -->
+<details class="perf-section" id="perfSection" open>
+  <summary>
+    <span class="perf-sum-title">Performance Scaling, Modelling &amp; Real-Data Overlay</span>
+    <span class="perf-sum-note">Latency curves · import StorM CSV measured data · visualise current reality vs new system headroom</span>
+  </summary>
+  <div class="perf-body">
+
+    <!-- ── StorM CSV Import ── -->
+    <div class="storm-panel" id="stormPanel">
+      <div class="storm-hdr">
+        <span class="storm-badge">StorM</span>
+        <h3>Import Storage Insights CSV — Real Measured Performance</h3>
+        <span id="stormStatusBadge" class="storm-status empty">No data loaded</span>
+        <button class="storm-clear-btn" id="stormClearBtn" style="display:none">✕ Clear</button>
+      </div>
+      <div class="storm-body">
+        <div class="drop-zone" id="stormDropZone">
+          <input type="file" id="stormFileInput" accept=".csv" multiple/>
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM12 17l-4-4h2.5v-4h3v4H16l-4 4z"/></svg>
+          <div><b>Drop Storage Insights CSV files here</b> or click to browse</div>
+          <div class="drop-zone-hint">Accepts multiple CSVs — one per system. Same format exported from IBM Storage Insights.</div>
+        </div>
+        <div id="stormResultsArea" style="display:none">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Peak Performance Summary (aggregated across all imported systems)</div>
+          <div style="overflow-x:auto">
+            <table class="storm-table" id="stormPeakTable">
+              <thead><tr>
+                <th>Peak Metric</th><th>Date / Time</th><th>Read %</th>
+                <th>Total IOPS</th><th>Avg Rd Xfer (KiB)</th>
+                <th>Avg Wr Xfer (KiB)</th><th>Cache Hit %</th>
+              </tr></thead>
+              <tbody id="stormPeakBody"></tbody>
+            </table>
+          </div>
+          <div class="storm-headroom" id="stormHeadroomGrid"></div>
+          <div style="font-size:10.5px;color:var(--faint);margin-top:6px;font-style:italic">
+            Peak values are the single worst-case 5-minute window across all imported CSV files. Timestamps are snapped to 5-minute boundaries to align samples across systems. The headroom chart below plots these peaks against the selected new FlashSystem model's limits.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Growth projection inputs -->
+    <div class="perf-inputs">
+      <div class="fld">
+        <label>IOPS growth rate <span class="def">(for projected-workload dot)</span></label>
+        <div class="iw"><input id="pg_rate" type="number" min="0" max="500" placeholder="e.g. 20"/><div class="unit">% / yr</div></div>
+      </div>
+      <div class="fld">
+        <label>Projection horizon</label>
+        <div class="iw"><input id="pg_yrs" type="number" min="1" max="10" placeholder="3"/><div class="unit">years</div></div>
+      </div>
+    </div>
+
+    <!-- Chart trio: IOPS latency | BW latency | StorM Headroom -->
+    <div class="charts-row">
+      <div class="chart-box" id="boxIops">
+        <div class="chart-box-title-bar">
+          <span class="chart-box-title">IOPS vs. Estimated Latency</span>
+          <div style="display:flex;gap:4px">
+            <button class="zoom-btn" data-zoom-target="wrapIops" data-action="in"  title="Zoom in">+</button>
+            <button class="zoom-btn" data-zoom-target="wrapIops" data-action="out" title="Zoom out">−</button>
+            <button class="zoom-btn" data-zoom-target="wrapIops" data-action="reset" title="Reset zoom" style="font-size:10px">⟳</button>
+            <button class="zoom-btn" data-png-chart="chartIops" data-png-title="IOPS-Latency" title="Export PNG" style="font-size:10px">↓</button>
+          </div>
+        </div>
+        <div class="chart-zoom-wrap" id="wrapIops"><div id="chartIops"></div></div>
+        <div class="chart-axis-row">
+          <label>X max:</label>
+          <input class="chart-axis-input" id="iops_xmax" type="number" min="1" placeholder="auto" title="Override max IOPS on x-axis"/>
+          <label>Y max:</label>
+          <input class="chart-axis-input" id="iops_ymax" type="number" min="0.01" step="0.1" placeholder="auto" title="Override max latency (ms) on y-axis"/>
+          <button class="chart-axis-reset" id="iops_axisReset" title="Reset to auto">Auto</button>
+        </div>
+      </div>
+      <div class="chart-box" id="boxBw">
+        <div class="chart-box-title-bar">
+          <span class="chart-box-title">Throughput vs. Estimated Latency</span>
+          <div style="display:flex;gap:4px">
+            <button class="zoom-btn" data-zoom-target="wrapBw" data-action="in"  title="Zoom in">+</button>
+            <button class="zoom-btn" data-zoom-target="wrapBw" data-action="out" title="Zoom out">−</button>
+            <button class="zoom-btn" data-zoom-target="wrapBw" data-action="reset" title="Reset zoom" style="font-size:10px">⟳</button>
+            <button class="zoom-btn" data-png-chart="chartBw" data-png-title="Throughput-Latency" title="Export PNG" style="font-size:10px">↓</button>
+          </div>
+        </div>
+        <div class="chart-zoom-wrap" id="wrapBw"><div id="chartBw"></div></div>
+        <div class="chart-axis-row">
+          <label>X max:</label>
+          <input class="chart-axis-input" id="bw_xmax" type="number" min="0.1" step="0.5" placeholder="auto" title="Override max throughput (GB/s) on x-axis"/>
+          <label>Y max:</label>
+          <input class="chart-axis-input" id="bw_ymax" type="number" min="0.01" step="0.1" placeholder="auto" title="Override max latency (ms) on y-axis"/>
+          <button class="chart-axis-reset" id="bw_axisReset" title="Reset to auto">Auto</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- StorM Headroom Chart — full width, shown only when data loaded, collapsible -->
+    <details class="chart-box" id="boxHeadroom" style="display:none" open>
+      <summary class="chart-box-title-bar" style="cursor:pointer;list-style:none;display:flex">
+        <span style="display:inline-block;font-size:8px;color:var(--cyan);transition:transform .15s;margin-right:6px;flex-shrink:0" id="headroomArrow">▶</span>
+        <span class="chart-box-title" style="flex:1">Current Measured Performance vs. New System Headroom</span>
+        <div style="display:flex;gap:4px" onclick="event.stopPropagation()">
+          <button class="zoom-btn" data-zoom-target="wrapHeadroom" data-action="in"  title="Zoom in">+</button>
+          <button class="zoom-btn" data-zoom-target="wrapHeadroom" data-action="out" title="Zoom out">−</button>
+          <button class="zoom-btn" data-zoom-target="wrapHeadroom" data-action="reset" title="Reset zoom" style="font-size:10px">⟳</button>
+          <button class="zoom-btn" data-png-chart="chartHeadroom" data-png-title="Headroom" title="Export PNG" style="font-size:10px">↓</button>
+        </div>
+      </summary>
+      <div class="chart-zoom-wrap" id="wrapHeadroom"><div id="chartHeadroom"></div></div>
+      <div style="font-size:10.5px;color:var(--faint);padding:4px 6px 6px;font-style:italic">
+        Orange bars = measured peak from Storage Insights CSV · Teal bars = new system comfortable ceiling · Gray bars = new system max saturation. Headroom = (ceiling − measured) / ceiling × 100%.
+      </div>
+    </details>
+
+    <!-- Visibility toggles -->
+    <div class="chart-vis-row">
+      <span class="chart-vis-label">Show:</span>
+      <label class="cvis" id="cvis_fs9600">
+        <input type="checkbox" id="chk_fs9600" checked/>
+        <span class="cvis-swatch" style="background:#00b4d8"></span>
+        FlashSystem 9600
+      </label>
+      <label class="cvis" id="cvis_fs7600">
+        <input type="checkbox" id="chk_fs7600" checked/>
+        <span class="cvis-swatch" style="background:#7c3aed"></span>
+        FlashSystem 7600
+      </label>
+      <label class="cvis" id="cvis_fs5600">
+        <input type="checkbox" id="chk_fs5600" checked/>
+        <span class="cvis-swatch" style="background:#f59e0b"></span>
+        FlashSystem 5600
+      </label>
+      <span class="cvis-divider"></span>
+      <label class="cvis" id="cvis_xaxis">
+        <input type="checkbox" id="chk_xaxis" checked/>
+        Total I/Ops axis
+      </label>
+      <label class="cvis" id="cvis_now">
+        <input type="checkbox" id="chk_now" checked/>
+        <span class="cldot" style="font-size:12px">●</span>NOW dot
+      </label>
+      <label class="cvis" id="cvis_proj">
+        <input type="checkbox" id="chk_proj" checked/>
+        <span class="cldot" style="font-size:12px">○</span>+Nyr dot
+      </label>
+      <span class="cvis-divider"></span>
+      <label class="cvis" id="cvis_storm">
+        <input type="checkbox" id="chk_storm" checked/>
+        <span class="cvis-swatch" style="background:#ea580c"></span>
+        StorM measured
+      </label>
+    </div>
+    <!-- Zone key -->
+    <div class="chart-legend-row">
+      <span class="chart-leg-item"><span class="clf green"></span>Comfortable — selected model zones</span>
+      <span class="chart-leg-item"><span class="clf yellow"></span>Marginal</span>
+      <span class="chart-leg-item"><span class="clf red"></span>Latency-impacting</span>
+      <span class="chart-leg-item"><span class="clf gray"></span>Grid territory</span>
+      <span class="chart-leg-item"><svg width="12" height="12" viewBox="0 0 12 12" style="margin-right:3px;flex-shrink:0"><polygon points="6,0 12,6 6,12 0,6" fill="#ea580c"/></svg>StorM measured peak (on latency curves)</span>
+      <div style="width:100%;margin-top:4px;font-size:10.5px;color:var(--faint);font-style:italic">
+        Latency curves are illustrative (queueing-theory model) — convey shape of the hockey stick and relative model capacity, not guaranteed SLAs. Confirm with IBM Configurator.
+      </div>
+    </div>
+  </div>
+</details>
+
+<!-- ══ EXPORT BAR ══ -->
+<div class="export-bar" id="exportBar">
+  <span class="export-bar-label">Export:</span>
+  <button class="btn-exp xlsx" id="btnExcelExport">
+    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM8.1 17l1.9-3.1L8.1 10.9h1.5L11 13.1l1.4-2.2h1.5L12 13.9 13.9 17h-1.5L11 14.7 9.6 17H8.1z"/></svg>
+    Export to CSV
+  </button>
+  <button class="btn-exp pdf" id="btnPdfExport">
+    <svg viewBox="0 0 24 24"><path d="M20 2H8a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm-8.5 7.5c0 .83-.67 1.5-1.5 1.5H9v2H7.5V7H10c.83 0 1.5.67 1.5 1.5v1zm5 2c0 .83-.67 1.5-1.5 1.5h-2.5V7H15c.83 0 1.5.67 1.5 1.5v3zm4-3H19v1h1.5V11H19v2h-1.5V7h3v1.5zM9 9.5h1v-1H9v1zM4 6H2v14a2 2 0 0 0 2 2h14v-2H4V6zm10 5.5h1v-3h-1v3z"/></svg>
+    Export Proposal PDF
+  </button>
+  <button class="btn-exp png" id="btnPngExport">
+    <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+    Export Charts PNG
+  </button>
+  <span style="font-size:11px;color:var(--faint);margin-left:4px">CSV opens in any spreadsheet app · PDF via browser print · PNG = all charts as individual files</span>
+</div>
+
+<!-- hidden print-only proposal header — populated by JS before printing -->
+<div class="print-proposal-header" id="printHeader"></div>
+
+<!-- tips -->
+<div class="tips">
+  <div class="tip"><b>IOPS → Throughput:</b> (Read IOPS × Read KiB + Write IOPS × Write KiB) × 1 024 ÷ 1 000 000 = MB/s &nbsp;·&nbsp; e.g. 105 000 reads × 8 KiB + 45 000 writes × 16 KiB → ~1 597 MB/s</div>
+  <div class="tip"><b>PBHA (sync):</b> RTT ≤ 1 ms → synchronous, RPO = 0 (metro distance — app waits for the far site on every write). Buffer = write MB/s × RTT ms ÷ 1 000. Replication follows <em>writes</em>, not capacity.</div>
+  <div class="tip"><b>PBR (async):</b> 1 ms &lt; RTT ≤ 80 ms → asynchronous. <em>Journaling</em> (link keeps up, RPO = seconds) vs <em>Cycling</em> (link lags, snapshot-based, larger RPO). Beyond 80 ms RTT, PBR is not supported.</div>
+  <div class="tip"><b>Link usable ≈ 80%:</b> 10 GbE → ~1 000 MB/s usable &nbsp;·&nbsp; 25 GbE → ~2 500 MB/s &nbsp;·&nbsp; 100 GbE → ~10 000 MB/s</div>
+  <div class="tip"><b>StorM import:</b> Drop any number of IBM Storage Insights per-system CSV exports. The tool aggregates across all systems, aligns 5-minute timestamps, and plots your real measured peaks directly onto the scaling charts so clients can see exactly where their current estate sits vs the new system's comfortable ceiling and maximum saturation point.</div>
+</div>
+
+<div class="foot">
+  <span id="footModel">IBM FlashSystem 9600 (5078-A40) · Storage Virtualize 9.1.2</span><br/>
+  All values are estimates for pre-sales sizing. Confirm with IBM Configurator and the v9.1.x configuration limits for final BOM.
+</div>
+<div class="made-with">Made with IBM Bob</div>
+
+</div><!-- /wrap -->
+
+<script>
+// fs-sv912-calculator-v6-script.js
+// Complete JavaScript for v6 with StorM CSV import, zoom/pan, PNG export
+
+(function(){
+'use strict';
+
+/* ══ FS9600 defaults ══════════════════════════════ */
+const MODELS = {
+  fs9600:{ name:'FlashSystem 9600', mtm:'5078-A40',
+           ceiliops:6_300_000, satiops:1_500_000, baseMs:0.113, ceilbw:86, maxpbe:11.8, gridpbe:377, nodemem:1_536 },
+  fs7600:{ name:'FlashSystem 7600', mtm:'5075-A30',
+           ceiliops:4_300_000, satiops:850_000,   baseMs:0.125, ceilbw:55, maxpbe:7.2,  gridpbe:230, nodemem:768   },
+  fs5600:{ name:'FlashSystem 5600', mtm:'5127-A20',
+           ceiliops:2_600_000, satiops:450_000,   baseMs:0.140, ceilbw:30, maxpbe:2.5,  gridpbe:77,  nodemem:512   },
+};
+
+// Conversion: decimal GB/s (10^9 B/s) → binary MiB/s (2^20 B/s)
+// 1 GB/s = 1e9 / (1024*1024) MiB/s ≈ 953.674 MiB/s
+const MIB_PER_GBPS = 1e9 / (1024 * 1024);
+
+const SHARED = {
+  derate:     60,
+  syncrtt:    1,
+  asyncrtt:   80,
+  readpct:    70,
+  blkkb:      8,
+  streamcomp: 2.0,
+  reduction:  3.0,
+  target:     80,
+};
+
+let modelKey = 'fs9600';
+let FS = Object.assign({}, SHARED, MODELS[modelKey]);
+
+const MEM = {
+  cacheReserve:  0.20,
+  writeCache:    0.15,
+  perVolumeKB:   64,
+};
+
+const SAMPLE = {
+  iops:150_000, readpct:70, blkkb:8, wblkkb:16,
+  capnow:200, capgrow:50, reduction:3.5, target:80,
+  rtt:12, linkgbps:10, streamcomp:2.0
+};
+
+// StorM data
+let stormData = null;
+
+const $ = id => document.getElementById(id);
+function gn(id){ const v=parseFloat($(id).value); return isFinite(v)&&v>0?v:null; }
+function gn0(id){ const v=parseFloat($(id).value); return isFinite(v)&&v>=0?v:null; }
+function get(id,def){
+  const v=parseFloat($(id).value);
+  if(isFinite(v)&&v>0) return {val:v,assumed:false};
+  return {val:def,assumed:true};
+}
+
+let rwLastEdited = null;
+function syncRW(source){
+  const rEl=$('readpct'), wEl=$('writepct');
+  const v=parseFloat(source==='read'?rEl.value:wEl.value);
+  if(!isFinite(v)||v<0||v>100){
+    if(source==='read'){ wEl.value=''; wEl.classList.remove('linked'); }
+    else               { rEl.value=''; rEl.classList.remove('linked'); }
+    return;
+  }
+  const complement=(100-v).toFixed(1).replace(/\.0$/,'');
+  if(source==='read'){
+    wEl.value=complement;
+    wEl.classList.add('linked');
+    rEl.classList.remove('linked');
+    rwLastEdited='read';
+  } else {
+    rEl.value=complement;
+    rEl.classList.add('linked');
+    wEl.classList.remove('linked');
+    rwLastEdited='write';
+  }
+}
+
+function getReadPct(){
+  const rv=parseFloat($('readpct').value);
+  const wv=parseFloat($('writepct').value);
+  if(isFinite(rv)&&rv>=0&&rv<=100) return {val:rv,assumed:false};
+  if(isFinite(wv)&&wv>=0&&wv<=100) return {val:100-wv,assumed:false};
+  return {val:FS.readpct,assumed:true};
+}
+
+function getSensitivity(){
+  const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+  const seqRaw=parseFloat($('seqpct').value);
+  const rRaw=parseFloat($('cacheeffrand').value);
+  const sRaw=parseFloat($('cacheeffseq').value);
+  const hasSeq = isFinite(seqRaw)&&seqRaw>=0&&seqRaw<=100;
+  const hasR   = isFinite(rRaw)&&rRaw>=0&&rRaw<=100;
+  const hasS   = isFinite(sRaw)&&sRaw>=0&&sRaw<=100;
+  if(!hasR && !hasS) return null;
+  let seqFrac, seqAssumed=false;
+  if(hasSeq){ seqFrac=seqRaw/100; }
+  else { seqFrac=0; seqAssumed=true; }
+  let blended, uniformAssumed=false;
+  if(hasR && hasS){
+    blended = seqFrac*(sRaw/100) + (1-seqFrac)*(rRaw/100);
+  } else if(hasR && !hasS){
+    blended = rRaw/100; uniformAssumed = hasSeq;
+  } else {
+    blended = sRaw/100; uniformAssumed = hasSeq;
+  }
+  const factor = clamp(1 + (blended-0.5)*0.4, 0.75, 1.25);
+  const extreme = factor<=0.76 || factor>=1.24;
+  return {factor, blended, seqFrac, seqAssumed, uniformAssumed, extreme};
+}
+
+function getWblk(readBlkVal){
+  const wv=parseFloat($('wblkkb').value);
+  if(isFinite(wv)&&wv>0) return {val:wv,assumed:false};
+  return {val:readBlkVal,assumed:true};
+}
+
+function tputMB(rIops,wIops,rTS,wTS){ return (rIops*rTS + wIops*wTS)*1024/1e6; }
+
+const fmt=(n,dp=1)=>n==null?'—':n.toLocaleString('en-US',{maximumFractionDigits:dp,minimumFractionDigits:0});
+const pct=n=>n==null?'—':n.toFixed(1)+'%';
+const atag=a=>a?'<span class="atag">assumed</span>':'';
+
+function stateOf(util){
+  if(util<=70) return 'ok';
+  if(util<=90) return 'warn';
+  return 'bad';
+}
+
+function perfState(util){
+  if(util<=60) return 'ok';
+  if(util<=80) return 'warn';
+  return 'bad';
+}
+
+function bar(util,state){
+  const w=Math.min(util,100).toFixed(1);
+  return `<div class="pbar-wrap"><div class="pbar-track"><div class="pbar-fill ${state}" style="width:${w}%"></div></div></div>`;
+}
+
+function row(lbl,val,form,big,valClass){
+  return `<div class="mrow">
+    <div class="mtop">
+      <span class="mlbl">${lbl}</span>
+      <span class="mval${big?' big':''}${valClass?' '+valClass:''}">${val}</span>
+    </div>
+    ${form?`<div class="mform">${form}</div>`:''}
+  </div>`;
+}
+
+function section(title){
+  return `<div class="res-section">${title}</div>`;
+}
+
+function latCurve(load,ceil,baseMs){
+  if(load<=0||ceil<=0) return baseMs;
+  const u=Math.min(load/ceil,0.999);
+  return baseMs/(1-u);
+}
+
+function fmtMs(v){return v<1?v.toFixed(2):v<10?v.toFixed(1):v.toFixed(0);}
+
+/* ══════════════════════════════════════════════════
+   CARD 1 — Local Performance
+══════════════════════════════════════════════════ */
+function calcPerf(){
+  const iops=gn('iops');
+  const card=$('card1'),verd=$('v1'),body=$('b1');
+  if(iops==null){
+    card.className='res-card idle'; verd.className='verdict'; verd.textContent='';
+    body.innerHTML='<div class="idle-msg">Enter Total IOPS to see performance analysis.</div>';
+    return;
+  }
+  const rp =getReadPct();
+  const bk =get('blkkb',  FS.blkkb);
+  const wbk=getWblk(bk.val);
+  const cI =get('ceiliops',FS.ceiliops);
+  const cS =get('satiops', FS.satiops);
+  const cD =get('derate',  FS.derate);
+  const cBw=get('ceilbw',  FS.ceilbw);
+  const sens=getSensitivity();
+  const readpct  = rp.val;
+  const blkkb    = bk.val;
+  const writepct = 100-readpct;
+  const readIops = iops*(readpct/100);
+  const writeIops= iops*(writepct/100);
+  const rTS = bk.val;
+  const wTS = wbk.val;
+  const totalMBs = tputMB(readIops,writeIops,rTS,wTS);
+  const readMBs  = tputMB(readIops,0,rTS,wTS);
+  const writeMBs = tputMB(0,writeIops,rTS,wTS);
+  const totalGBs = totalMBs/1000;
+  const satIops    = cS.val;
+  const comfortPct = cD.val;
+  const usableIops = satIops*(comfortPct/100);
+  const iopsUtil   = (iops/satIops)*100;
+  const bwUtil     = (totalGBs/cBw.val)*100;
+  const curLatency = latCurve(iops, satIops, FS.baseMs);
+  const worst      = Math.max(iopsUtil,bwUtil);
+  const state      = perfState(worst);
+  card.className=`res-card ${state}`;
+  verd.className=`verdict ${state}`;
+  verd.textContent=state==='ok'?'FITS':state==='warn'?'MARGINAL':'OVER LIMIT';
+  const writePenNote = writepct>50
+    ? '<div class="tip-note warn">Write-heavy workload (&gt;50% writes). NAND flash write amplification lowers effective IOPS — the real saturation point may sit below the estimate; validate in Storage Modeller.</div>'
+    : '';
+  const bwBottleneck = bwUtil>iopsUtil && bwUtil>60;
+  const bwNote = bwBottleneck
+    ? '<div class="tip-note warn">Bandwidth-bottlenecked workload. Large block sizes consume GB/s headroom faster than IOPS count suggests.</div>'
+    : '';
+  const sensNote = sens
+    ? `<div class="tip-note ${sens.extreme?'warn':''}">💡 Sensitivity-adjusted ceiling is an estimate from assumed I/O-pattern and cache-hit-rate inputs — not a hardware specification. `+
+      `${sens.extreme?'This estimate sits at the edge of a plausible range; treat it as a flag to measure, not a number to size against. ':''}`+
+      `Validate against IBM Storage Insights telemetry before using it in a sizing commitment.</div>`
+    : '';
+  const replOverheadNote = `<div class="tip-note">💡 Core utilisation and latency above reflect <strong>host I/O only</strong>. Active PBR/PBHA replication (change tracking, journaling, cycling snapshots) adds its own controller CPU load that is not modeled here — neither IBM's published material nor the Storage Modeller reference used to calibrate this card quantifies that overhead separately. If replication is active (see the Replication card), treat this utilisation as a floor, not the full picture.</div>`;
+  body.innerHTML=
+    section('IOPS breakdown')+
+    row(`Read IOPS${atag(rp.assumed)}`,
+        fmt(readIops,0)+' IOPS',
+        `${fmt(iops,0)} total × ${fmt(readpct,0)}% = ${fmt(readIops,0)} IOPS`)+
+    row(`Write IOPS${atag(rp.assumed)}`,
+        fmt(writeIops,0)+' IOPS',
+        `${fmt(iops,0)} total × ${fmt(writepct,0)}% = ${fmt(writeIops,0)} IOPS`)+
+    section('Throughput')+
+    row(`Total throughput${atag(bk.assumed||wbk.assumed)}`,
+        fmt(totalMBs,0)+' MB/s = '+fmt(totalGBs,2)+' GB/s',
+        `${fmt(readIops,0)}×${rTS} + ${fmt(writeIops,0)}×${wTS} KiB/op = ${fmt(totalMBs,0)} MB/s (${fmt(totalMBs/1.048576,0)} MiB/s)`,
+        true)+
+    row('  Read throughput',fmt(readMBs,0)+' MB/s',
+        `${fmt(readIops,0)} reads × ${rTS} KiB/op = ${fmt(readMBs,0)} MB/s`)+
+    row('  Write throughput',fmt(writeMBs,0)+' MB/s',
+        `${fmt(writeIops,0)} writes × ${wTS} KiB/op${wbk.assumed?' [= read size]':''} = ${fmt(writeMBs,0)} MB/s`)+
+    section('System headroom')+
+    row(`Mixed-workload saturation${atag(cS.assumed)}`,
+        fmt(satIops,0)+' IOPS',
+        `core saturates here for a typical mixed workload — datasheet 4K read-hit peak is ${fmt(cI.val,0)}`)+
+    row(`Comfortable ceiling${atag(cD.assumed)}`,
+        fmt(usableIops,0)+' IOPS',
+        `${fmt(satIops,0)} saturation × ${comfortPct}% comfort target = ${fmt(usableIops,0)} IOPS`)+
+    (sens ? row(
+        'Sensitivity-adjusted saturation (est.)',
+        fmt(satIops*sens.factor,0)+' IOPS',
+        `${fmt(satIops,0)} × ${fmt(sens.factor*100,0)}% workload-mix factor `+
+        `(blended cache hit ≈ ${fmt(sens.blended*100,0)}%${sens.seqAssumed?', sequential % assumed 0':''}`+
+        `${sens.uniformAssumed?', one efficiency value applied uniformly':''}) = `+
+        `${fmt(satIops*sens.factor,0)} IOPS`
+      ) : '')+
+    row('Core utilisation',pct(iopsUtil),
+        `${fmt(iops,0)} ÷ ${fmt(satIops,0)} = ${pct(iopsUtil)}  ·  ≈ IBM Modeller "System Core %"`,
+        true,perfState(iopsUtil))+
+    bar(Math.min(iopsUtil,100),perfState(iopsUtil))+
+    row('Est. latency at this load',fmtMs(curLatency)+' ms',
+        `${fmtMs(FS.baseMs)} ms base ÷ (1 − ${(Math.min(iopsUtil/100,0.999)).toFixed(3)}) = ${fmtMs(curLatency)} ms`)+
+    row(`Bandwidth ceiling${atag(cBw.assumed)}`,fmt(cBw.val,0)+' GB/s')+
+    row('Bandwidth utilisation',pct(bwUtil),
+        `${fmt(totalGBs,2)} GB/s ÷ ${cBw.val} GB/s = ${pct(bwUtil)}`,
+        true,perfState(bwUtil))+
+    bar(Math.min(bwUtil,100),perfState(bwUtil))+
+    writePenNote+bwNote+sensNote+replOverheadNote;
+}
+
+/* ══════════════════════════════════════════════════
+   CARD 2 — Capacity
+══════════════════════════════════════════════════ */
+function calcCap(){
+  const capnow=gn('capnow');
+  const card=$('card2'),verd=$('v2'),body=$('b2');
+  if(capnow==null){
+    card.className='res-card idle'; verd.className='verdict'; verd.textContent='';
+    body.innerHTML='<div class="idle-msg">Enter Data today (TB) to see capacity analysis.</div>';
+    return;
+  }
+  const gr=get('reduction',FS.reduction);
+  const tg=get('target',   FS.target);
+  const mx=get('maxpbe',   FS.maxpbe);
+  const rawGrow=gn0('capgrow');
+  const grow=rawGrow!=null?rawGrow:0;
+  const totalLogTB    = capnow+grow;
+  const physFlashTB   = totalLogTB/gr.val;
+  const rtt      = gn('rtt');
+  const syncLim  = get('syncrtt', FS.syncrtt);
+  const asyncLim = get('asyncrtt',FS.asyncrtt);
+  const isPbrAsync = rtt!=null && rtt>syncLim.val && rtt<=asyncLim.val;
+  const cv = get('cvpct', 10);
+  const changeVolTB = isPbrAsync ? totalLogTB*(cv.val/100) : 0;
+  const effWithHeadTB = (totalLogTB+changeVolTB)/(tg.val/100);
+  const effWithHeadPB = effWithHeadTB/1000;
+  const util          = (effWithHeadPB/mx.val)*100;
+  const state         = stateOf(util);
+  card.className=`res-card ${state}`;
+  verd.className=`verdict ${state}`;
+  verd.textContent=state==='ok'?'FITS':state==='warn'?'TIGHT':'TOO LARGE';
+  body.innerHTML=
+    section('Logical (effective) data')+
+    row('Total logical data',
+        fmt(totalLogTB,0)+' TB',
+        grow>0
+          ?`${fmt(capnow,0)} TB today + ${fmt(grow,0)} TB growth = ${fmt(totalLogTB,0)} TB`
+          :`${fmt(capnow,0)} TB (no growth specified)`)+
+    section('Physical flash (informational)')+
+    row(`Physical flash consumed${atag(gr.assumed)}`,
+        fmt(physFlashTB,1)+' TB',
+        `${fmt(totalLogTB,0)} TB logical ÷ ${gr.val}:1 DRR = ${fmt(physFlashTB,1)} TB of flash`)+
+    section('Effective capacity sizing')+
+    (isPbrAsync ? row(`Change volume reserve${atag(cv.assumed)}`,
+        fmt(changeVolTB,1)+' TB',
+        `PBR async is active (RTT ${rtt} ms) → change volumes used in cycling and always during resync. `+
+        `${fmt(totalLogTB,0)} TB × ${cv.val}% = ${fmt(changeVolTB,1)} TB reserved on THIS system — the same `+
+        `${fmt(changeVolTB,1)} TB is also needed on the recovery system (not shown here; size it separately).`
+      ) : '')+
+    row(`Effective needed with headroom${atag(tg.assumed)}`,
+        fmt(effWithHeadTB,1)+' TB = '+fmt(effWithHeadPB,3)+' PBe',
+        isPbrAsync
+          ? `(${fmt(totalLogTB,0)} + ${fmt(changeVolTB,1)} TB change vol) ÷ ${tg.val}% target = ${fmt(effWithHeadTB,1)} TB → ÷ 1 000 = ${fmt(effWithHeadPB,3)} PBe`
+          : `${fmt(totalLogTB,0)} TB ÷ ${tg.val}% target = ${fmt(effWithHeadTB,1)} TB → ÷ 1 000 = ${fmt(effWithHeadPB,3)} PBe`,
+        true)+
+    section('Array fit')+
+    row(`Array max effective capacity${atag(mx.assumed)}`,fmt(mx.val,1)+' PBe')+
+    row('Capacity utilisation',pct(util),
+        `${fmt(effWithHeadPB,3)} PBe ÷ ${fmt(mx.val,1)} PBe = ${pct(util)}`,
+        true,state)+
+    bar(util,state)+
+    (isPbrAsync
+      ? `<div class="tip-note">💡 Includes a ${cv.val}% change-volume reserve (IBM guideline, up to 10% on both production and recovery systems) because PBR async replication is active. Fit compares your logical (effective) data + change volumes against the array's effective capacity. The ${fmt(mx.val,1)} PBe ceiling assumes a reference data-reduction ratio — if your data reduces better or worse than your DRR suggests, realised effective capacity scales accordingly. A FlashSystem grid (up to 32 systems) scales to ~${FS.gridpbe} PBe.</div>`
+      : `<div class="tip-note">💡 Fit compares your logical (effective) data against the array's effective capacity. The ${fmt(mx.val,1)} PBe ceiling assumes a reference data-reduction ratio — if your data reduces better or worse than your DRR suggests, realised effective capacity scales accordingly. A FlashSystem grid (up to 32 systems) scales to ~${FS.gridpbe} PBe.${rtt==null?' If this data will be PBR-replicated, enter RTT on the Replication card to include the ~10% change-volume reserve here.':''}</div>`);
+}
+
+/* ══════════════════════════════════════════════════
+   CARD 3 — PBR / PBHA Replication
+══════════════════════════════════════════════════ */
+function calcRepl(){
+  const rtt=gn('rtt');
+  const card=$('card3'),verd=$('v3'),body=$('b3');
+  if(rtt==null){
+    card.className='res-card idle'; verd.className='verdict'; verd.textContent='';
+    body.innerHTML='<div class="idle-msg">Enter RTT to DR site to see replication analysis.</div>';
+    return;
+  }
+  const sc      =get('streamcomp',FS.streamcomp);
+  const syncLim =get('syncrtt',   FS.syncrtt);
+  const asyncLim=get('asyncrtt',  FS.asyncrtt);
+  const rp      =getReadPct();
+  const bk      =get('blkkb',     FS.blkkb);
+  const iops    =gn('iops');
+  const link    =gn('linkgbps');
+  const isSync    = rtt<=syncLim.val;
+  const overAsync = rtt>asyncLim.val;
+  let writeMBs=null, writeIops=null, writeAssumed=false;
+  if(iops!=null){
+    const writepct=100-rp.val;
+    writeIops  = iops*(writepct/100);
+    writeMBs   = tputMB(0,writeIops,bk.val,getWblk(bk.val).val);
+    writeAssumed = rp.assumed||bk.assumed;
+  }
+  const onWireMBs  = writeMBs!=null ? writeMBs/sc.val     : null;
+  const onWireGbps = onWireMBs!=null? onWireMBs/125       : null;
+  const linkUsableMBs = link!=null   ? link*125*0.80       : null;
+  const linkUtil   = (onWireMBs!=null&&linkUsableMBs!=null)
+                       ? (onWireMBs/linkUsableMBs)*100 : null;
+  const bufferMB   = writeMBs!=null  ? writeMBs*(rtt/1000) : null;
+  const bufferGB   = bufferMB!=null  ? bufferMB/1000 : null;
+  let asyncMode='';
+  if(!isSync && onWireMBs!=null && linkUsableMBs!=null){
+    asyncMode = onWireMBs<=linkUsableMBs ? 'journaling' : 'cycling';
+  } else if(!isSync){
+    asyncMode = 'unknown';
+  }
+  let state, vtext;
+  if(overAsync){
+    state='bad'; vtext='RTT TOO HIGH';
+  } else if(linkUtil!=null){
+    state=stateOf(linkUtil);
+    vtext=state==='ok'?'FEASIBLE':state==='warn'?'MARGINAL':'OVER LINK';
+  } else if(onWireGbps!=null){
+    if(onWireGbps<=25)       {state='ok';  vtext='FEASIBLE';}
+    else if(onWireGbps<=100) {state='warn';vtext='HIGH BW';}
+    else                     {state='bad'; vtext='OVER 100G';}
+  } else {
+    state='info'; vtext='PARTIAL';
+  }
+  card.className=`res-card ${state}`;
+  verd.className=`verdict ${state==='info'?'partial':state}`;
+  verd.textContent=vtext;
+  const modeBadge = overAsync
+    ? `<div class="mode-badge async-cycle">RTT ${rtt} ms &gt; ${asyncLim.val} ms — beyond supported PBR async limit</div>`
+    : isSync
+      ? `<div class="mode-badge sync">PBHA SYNC — RPO = 0 · RTT ${rtt} ms ≤ ${syncLim.val} ms</div>`
+      : asyncMode==='journaling'
+        ? `<div class="mode-badge async">PBR ASYNC / JOURNALING — RPO = seconds · RTT ${rtt} ms</div>`
+        : asyncMode==='cycling'
+          ? `<div class="mode-badge async-cycle">PBR ASYNC / CYCLING — RPO = snapshot interval · bandwidth insufficient</div>`
+          : `<div class="mode-badge async">PBR ASYNC — ${syncLim.val} ms &lt; RTT ${rtt} ms ≤ ${asyncLim.val} ms</div>`;
+  let html = section('Replication mode')+modeBadge;
+  html+=row(`RTT vs thresholds${atag(syncLim.assumed||asyncLim.assumed)}`,
+    overAsync
+      ? `${rtt} ms > ${asyncLim.val} ms`
+      : isSync
+        ? `${rtt} ms ≤ ${syncLim.val} ms`
+        : `${syncLim.val} < ${rtt} ms ≤ ${asyncLim.val}`,
+    overAsync
+      ? `RTT ${rtt} ms exceeds PBR async max ${asyncLim.val} ms → replication not supported. Reduce distance or use externally orchestrated DR.`
+      : isSync
+        ? `RTT ${rtt} ms ≤ ${syncLim.val} ms → PBHA synchronous (RPO = 0, metro distance)`
+        : `${syncLim.val} ms < RTT ${rtt} ms ≤ ${asyncLim.val} ms → PBR asynchronous (RPO > 0)`);
+  html+=`<div class="tip-note">💡 PBR/PBHA run over either an IP or a Fibre Channel partnership — this card assumes a shared IP WAN link (the common case for distance DR). If your design uses an FC partnership (FCIP/DWDM) or short-distance RDMA over Ethernet, the Gbps/MB/s link math still applies, but the compression assumption below is specific to native IP or FCIP replication — set it to 1:1 if compression isn't part of your transport.</div>`;
+  if(writeMBs!=null){
+    html+=section('Replication bandwidth')+
+    row(`Write throughput${atag(writeAssumed)}`,
+        fmt(writeMBs,0)+' MB/s',
+        iops!=null
+          ?`${fmt(iops,0)} IOPS × ${(100-rp.val).toFixed(0)}% write = ${fmt(writeIops,0)} IOPS\n${fmt(writeIops,0)} writes × ${getWblk(bk.val).val} KiB/op = ${fmt(writeMBs,0)} MB/s`
+          :'(entered directly)')+
+    row(`On-wire after compression${atag(sc.assumed)}`,
+        fmt(onWireMBs,0)+' MB/s = '+fmt(onWireGbps,1)+' Gbps',
+        `${fmt(writeMBs,0)} MB/s ÷ ${sc.val} = ${fmt(onWireMBs,0)} MB/s → ÷ 125 = ${fmt(onWireGbps,1)} Gbps`,
+        true);
+  } else {
+    html+='<div class="tip-note">💡 Enter IOPS to compute write throughput and required link bandwidth.</div>';
+  }
+  if(linkUsableMBs!=null){
+    html+=section('Link capacity')+
+    row(`Link usable (${link} Gbps × 80%)`,
+        fmt(linkUsableMBs,0)+' MB/s',
+        `${link} Gbps × 125 MB/s/Gbps × 80% = ${fmt(linkUsableMBs,0)} MB/s`);
+    if(linkUtil!=null){
+      html+=row('Link utilisation',pct(linkUtil),
+          `${fmt(onWireMBs,0)} MB/s on-wire ÷ ${fmt(linkUsableMBs,0)} MB/s usable = ${pct(linkUtil)}`,
+          true,stateOf(linkUtil))+
+        bar(linkUtil,stateOf(linkUtil));
+    }
+    if(!isSync && writeMBs!=null){
+      html+=`<div class="tip-note ${asyncMode==='journaling'?'ok':'warn'}">
+        ${asyncMode==='journaling'
+          ?'✔ Link can keep up with change rate → PBR will use <strong>journaling mode</strong> (RPO in seconds).'
+          :'⚠ Link cannot keep up with change rate → PBR will fall back to <strong>cycling mode</strong> (snapshot-based, larger RPO). Increase link speed or reduce change rate.'}
+      </div>`;
+    }
+  } else if(writeMBs!=null){
+    html+='<div class="tip-note">💡 Enter WAN Link speed (Gbps) to check if the pipe can keep up and see link utilisation.</div>';
+  }
+  if(isSync && bufferMB!=null){
+    html+=section('PBHA journal buffer')+
+    row('Buffer needed (in-flight writes)',
+        fmt(bufferMB,0)+' MB = '+fmt(bufferGB,2)+' GB',
+        `write rate ${fmt(writeMBs,0)} MB/s × RTT ${rtt} ms ÷ 1 000 = ${fmt(bufferMB,0)} MB`,
+        true);
+  }
+  body.innerHTML=html;
+}
+
+/* ══════════════════════════════════════════════════
+   CARD 4 — System Memory
+══════════════════════════════════════════════════ */
+function calcMem(){
+  const iops   =gn('iops');
+  const rtt    =gn('rtt');
+  const card=$('card4'),verd=$('v4'),body=$('b4');
+  if(iops==null&&rtt==null){
+    card.className='res-card idle'; verd.className='verdict'; verd.textContent='';
+    body.innerHTML='<div class="idle-msg">Enter IOPS and/or RTT to see memory analysis.</div>';
+    return;
+  }
+  const nm   =get('nodemem', FS.nodemem);
+  const rp   =getReadPct();
+  const bk   =get('blkkb',   FS.blkkb);
+  const sc   =get('streamcomp',FS.streamcomp);
+  const syncLim=get('syncrtt',FS.syncrtt);
+  const totalMemGB   = nm.val;
+  const osReserveGB  = totalMemGB*MEM.cacheReserve;
+  const usableMemGB  = totalMemGB-osReserveGB;
+  const writeCacheGB = usableMemGB*MEM.writeCache;
+  const readCacheGB  = usableMemGB-writeCacheGB;
+  let bufferGB=0, writeMBs=0, writeIops=0;
+  const rttKnown = rtt!=null;
+  const isSync   = rttKnown && rtt<=syncLim.val;
+  if(iops!=null){
+    const writepct=100-rp.val;
+    writeIops= iops*(writepct/100);
+    writeMBs = tputMB(0,writeIops,bk.val,getWblk(bk.val).val);
+  }
+  if(isSync && writeMBs>0){
+    const bufferMB = writeMBs*(rtt/1000);
+    bufferGB = bufferMB/1000;
+  }
+  const totalUsedGB  = writeCacheGB+bufferGB;
+  const memUtil      = (totalUsedGB/usableMemGB)*100;
+  const state        = stateOf(memUtil);
+  card.className=`res-card ${state}`;
+  verd.className=`verdict ${state}`;
+  verd.textContent=state==='ok'?'OK':state==='warn'?'REVIEW':'TIGHT';
+  body.innerHTML=
+    section('Node memory allocation')+
+    row(`Total node memory${atag(nm.assumed)}`,fmt(totalMemGB,0)+' GB')+
+    row('OS + metadata reserve (20%)',
+        fmt(osReserveGB,0)+' GB',
+        `${fmt(totalMemGB,0)} GB × 20% = ${fmt(osReserveGB,0)} GB`)+
+    row('Usable for cache',
+        fmt(usableMemGB,0)+' GB',
+        `${fmt(totalMemGB,0)} − ${fmt(osReserveGB,0)} = ${fmt(usableMemGB,0)} GB`)+
+    section('Cache allocation')+
+    row('Write cache (15% of usable)',
+        fmt(writeCacheGB,1)+' GB',
+        `${fmt(usableMemGB,0)} GB × 15% = ${fmt(writeCacheGB,1)} GB`)+
+    row('Read cache (85% of usable)',
+        fmt(readCacheGB,1)+' GB',
+        `${fmt(usableMemGB,0)} GB × 85% = ${fmt(readCacheGB,1)} GB`)+
+    (iops!=null
+      ? section('Write throughput context')+
+        row(`Write IOPS${atag(rp.assumed)}`,
+            fmt(writeIops,0)+' IOPS',
+            `${fmt(iops,0)} × ${(100-rp.val).toFixed(0)}% = ${fmt(writeIops,0)} IOPS`)+
+        row(`Write throughput${atag(bk.assumed)}`,
+            fmt(writeMBs,0)+' MB/s',
+            `${fmt(writeIops,0)} writes × ${getWblk(bk.val).val} KiB/op = ${fmt(writeMBs,0)} MB/s`)
+      :'')+
+    (rttKnown
+      ? section('PBHA journal buffer (sync only)')+
+        row(`Replication mode${atag(syncLim.assumed)}`,
+            isSync?'PBHA SYNC — buffer required':'PBR ASYNC — no journal buffer')+
+        (isSync && writeMBs>0
+          ? row('PBHA journal buffer',
+                fmt(bufferGB*1000,0)+' MB = '+fmt(bufferGB,2)+' GB',
+                `${fmt(writeMBs,0)} MB/s × ${rtt} ms ÷ 1 000 = ${fmt(bufferGB*1000,0)} MB`)
+          : iops==null
+            ? '<div class="tip-note">💡 Enter IOPS to size the PBHA journal buffer.</div>'
+            : row('PBHA journal buffer','0 MB','PBR async — no synchronous journal buffer required'))
+      : '<div class="tip-note">💡 Enter RTT to determine if PBHA journal buffer memory is needed.</div>')+
+    section('Memory utilisation estimate')+
+    row('Memory consumed (cache + buffer)',
+        fmt(totalUsedGB,1)+' GB',
+        `${fmt(writeCacheGB,1)} GB write cache + ${fmt(bufferGB,2)} GB PBHA buffer = ${fmt(totalUsedGB,1)} GB`)+
+    row('Utilisation of usable memory',pct(memUtil),
+        `${fmt(totalUsedGB,1)} ÷ ${fmt(usableMemGB,0)} GB = ${pct(memUtil)}`,
+        true,state)+
+    bar(memUtil,state)+
+    (bufferGB>readCacheGB*0.05
+      ? '<div class="tip-note warn">PBHA buffer is consuming significant memory. For very high write rates with low RTT, validate buffer does not crowd out read cache. Consider async (PBR) if RTT allows.</div>'
+      : '');
+}
+
+function recalc(){ calcPerf(); calcCap(); calcRepl(); calcMem(); drawCharts(); }
+
+// Only true per-model hardware ceilings are cleared on model switch.
+// derate, syncrtt, asyncrtt, cvpct are Storage Virtualize software characteristics —
+// they are the same across all three models (they live in SHARED, not MODELS) and
+// must persist when the user switches the model dropdown to compare options.
+const MODEL_OVERRIDE_FIELDS = ['ceiliops','satiops','ceilbw','maxpbe','nodemem'];
+
+function applyModel(key){
+  if(!MODELS[key]) key='fs9600';
+  modelKey=key;
+  const m=MODELS[key];
+  FS=Object.assign({}, SHARED, m);
+  // clear override fields before updating placeholders — prevents a prior model's
+  // typed value from being read by get() as if it belongs to the new model
+  MODEL_OVERRIDE_FIELDS.forEach(id=>{ const el=$(id); if(el) el.value=''; });
+  const n=v=>v.toLocaleString('en-US');
+  $('ceiliops').placeholder=String(m.ceiliops); $('defIops').textContent=n(m.ceiliops);
+  $('satiops').placeholder =String(m.satiops);  $('defSat').textContent =n(m.satiops);
+  $('ceilbw').placeholder  =String(m.ceilbw);   $('defBw').textContent  =m.ceilbw+' GB/s';
+  $('maxpbe').placeholder  =String(m.maxpbe);   $('defPbe').textContent =m.maxpbe+' PBe';
+  $('nodemem').placeholder =String(m.nodemem);  $('defMem').textContent =n(m.nodemem)+' GB';
+  // update Advanced panel label to reflect the currently selected model
+  const advSum = $('advSummary');
+  if(advSum) advSum.textContent = `${m.name} array ceilings (override)`;
+  $('footModel').textContent=
+    `IBM ${m.name} (${m.mtm}) · Storage Virtualize 9.1.2 · Single enclosure: `+
+    `${n(m.ceiliops)} IOPS (4K read-hit) · ${m.ceilbw} GB/s · ${m.maxpbe} PBe · grid up to ${m.gridpbe} PBe`;
+  recalc();
+}
+
+$('model').addEventListener('change',e=>applyModel(e.target.value));
+$('readpct').addEventListener('input',()=>{ syncRW('read');  recalc(); });
+$('writepct').addEventListener('input',()=>{ syncRW('write'); recalc(); });
+['iops','blkkb','capnow','capgrow','reduction','target',
+ 'rtt','linkgbps','streamcomp','ceiliops','satiops','derate','ceilbw','maxpbe','syncrtt','asyncrtt','nodemem',
+ 'seqpct','cacheeffrand','cacheeffseq','wblkkb','cvpct']
+  .forEach(id=>$(id).addEventListener('input',recalc));
+['pg_rate','pg_yrs'].forEach(id=>$(id).addEventListener('input',drawCharts));
+
+/* ── axis range overrides ── */
+['iops_xmax','iops_ymax','bw_xmax','bw_ymax'].forEach(id=>$(id).addEventListener('input',drawCharts));
+$('iops_axisReset').addEventListener('click',()=>{
+  $('iops_xmax').value=''; $('iops_ymax').value=''; drawCharts();
+});
+$('bw_axisReset').addEventListener('click',()=>{
+  $('bw_xmax').value=''; $('bw_ymax').value=''; drawCharts();
+});
+
+$('btnSample').addEventListener('click',()=>{
+  Object.entries(SAMPLE).forEach(([id,v])=>{const el=$(id);if(el)el.value=v;});
+  syncRW('read');
+  recalc();
+});
+
+$('btnClear').addEventListener('click',()=>{
+  ['iops','readpct','writepct','blkkb','capnow','capgrow','reduction','target',
+  'rtt','linkgbps','streamcomp','ceiliops','satiops','derate','ceilbw','maxpbe','syncrtt','asyncrtt','nodemem',
+  'seqpct','cacheeffrand','cacheeffseq','wblkkb','cvpct',
+  'pg_rate','pg_yrs',
+  'iops_xmax','iops_ymax','bw_xmax','bw_ymax']
+    .forEach(id=>{
+      const el=$(id);
+      if(el){ el.value=''; el.classList.remove('linked'); }
+    });
+  rwLastEdited=null;
+  recalc();
+});
+
+// ═══════════════════════════════════════════════════════════════
+// PERFORMANCE CHARTS — with zoom/pan
+// ═══════════════════════════════════════════════════════════════
+// Per-model colours — kept constant; ceilings are resolved dynamically via resolvedCM()
+const CM_COLORS = { fs9600:'#00b4d8', fs7600:'#7c3aed', fs5600:'#f59e0b' };
+
+// Returns the chart model array, merging any active Advanced overrides into the
+// currently selected model only. Non-selected models always use MODELS defaults.
+function resolvedCM(){
+  return Object.keys(MODELS).map(key => {
+    const m = MODELS[key];
+    const isSelected = key === modelKey;
+    return {
+      key,
+      label:   m.name.replace('FlashSystem ',''),
+      color:   CM_COLORS[key],
+      baseMs:  m.baseMs,
+      ceiliops: isSelected ? get('ceiliops', m.ceiliops).val : m.ceiliops,
+      satiops:  isSelected ? get('satiops',  m.satiops ).val : m.satiops,
+      ceilbw:   isSelected ? get('ceilbw',   m.ceilbw  ).val : m.ceilbw,
+    };
+  });
+}
+
+const vis={
+  fs9600:true, fs7600:true, fs5600:true,
+  xaxis:true,  now:true,    proj:true, storm:true
+};
+
+function niceY(v){
+  if(!v||v<=0) return 1;
+  const steps=[0.1,0.2,0.25,0.5,1,2,2.5,5,7.5,10,15,20,50,100];
+  const mag=Math.pow(10,Math.floor(Math.log10(v)));
+  for(const s of steps){const c=s*mag;if(c>=v*0.99)return c;}
+  return Math.ceil(v/10)*10;
+}
+
+function yTickVals(max){
+  if(max<=0)return [0];
+  const raw=max/5;
+  const mag=Math.pow(10,Math.floor(Math.log10(raw)));
+  const cands=[0.05,0.1,0.2,0.25,0.5,1,2,2.5,5,10,20,25,50].map(x=>x*mag);
+  const step=cands.find(x=>x>=raw)||raw;
+  const t=[];let v=0;
+  while(v<=max*1.001){t.push(parseFloat(v.toFixed(12)));v+=step;}
+  return t;
+}
+
+function xTickVals(max){
+  if(max<=0)return [0];
+  const raw=max/8;
+  const mag=Math.pow(10,Math.floor(Math.log10(raw)));
+  const cands=[1,2,2.5,5,10,20,25,50,100,200,250,500,1000,2500,5000,
+               10000,25000,50000,100000,200000,250000,500000,1000000,2000000].map(x=>x*mag);
+  const step=cands.find(x=>x>=raw)||raw;
+  const t=[];let v=0;
+  while(v<=max*1.001){t.push(parseFloat(v.toFixed(12)));v+=step;}
+  return t;
+}
+
+function fmtIOPS(v){
+  if(v===0)return '0';
+  if(v>=1000000)return (v/1000000).toFixed(1).replace(/\.0$/,'')+'M';
+  if(v>=1000)return (v/1000).toFixed(1).replace(/\.0$/,'')+'K';
+  return String(Math.round(v));
+}
+
+function buildChart(cfg){
+  const {uid,title,xMax,yMaxOverride,xLabel,xFmt,getCeil,currentX,projX,projYrs,deratePct,stormX,cm}=cfg;
+  const W=640,H=315;
+  const ml=58,mr=38,mt=30,mb=56;
+  const pw=W-ml-mr,ph=H-mt-mb;
+  const visibleCM=cm.filter(m=>vis[m.key]);
+  const refCM=cm.find(m=>m.key===modelKey)||cm[0];
+  // fallback to full cm list when all model checkboxes are unchecked
+  const activeCM = visibleCM.length ? visibleCM : cm;
+  let rawY=0;
+  activeCM.forEach(m=>{
+    const c=getCeil(m);
+    rawY=Math.max(rawY,latCurve(0.90*c,c,m.baseMs));
+  });
+  if(vis.now&&currentX!=null&&currentX>0){
+    activeCM.forEach(m=>{
+      const c=getCeil(m);
+      rawY=Math.max(rawY,latCurve(Math.min(currentX,c*0.9995),c,m.baseMs));
+    });
+  }
+  if(vis.proj&&projX!=null&&projX>0){
+    activeCM.forEach(m=>{
+      const c=getCeil(m);
+      rawY=Math.max(rawY,latCurve(Math.min(projX,c*0.9995),c,m.baseMs));
+    });
+  }
+  // expand Y range so StorM dot is never clipped
+  if(vis.storm&&stormX!=null&&stormX>0){
+    activeCM.forEach(m=>{
+      const c=getCeil(m);
+      rawY=Math.max(rawY,latCurve(Math.min(stormX,c*0.9995),c,m.baseMs));
+    });
+  }
+  if(rawY<=0) rawY=1;
+  const yMax = (yMaxOverride!=null && yMaxOverride>0) ? yMaxOverride : niceY(rawY*1.2);
+  const sx=x=>ml+(Math.min(x,xMax)/xMax)*pw;
+  const sy=y=>mt+ph-(Math.min(y,yMax)/yMax)*ph;
+  const f=n=>n.toFixed(1);
+  const z9c=getCeil(refCM);
+  const zG=sx(z9c*(deratePct/100));
+  const zA=sx(z9c*0.875);
+  const zR=sx(z9c);
+  const zE=ml+pw;
+  const lbF=`font-size="9" font-weight="700" font-family="-apple-system,sans-serif"`;
+  const txF=`font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif"`;
+  let o=[];
+  o.push(`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">`);
+  o.push(`<defs><clipPath id="cp${uid}"><rect x="${ml}" y="${mt}" width="${pw}" height="${ph}"/></clipPath></defs>`);
+  o.push(`<rect x="${ml}" y="${mt}" width="${f(Math.max(0,zG-ml))}" height="${ph}" fill="rgba(5,150,105,.07)"/>`);
+  o.push(`<rect x="${f(zG)}" y="${mt}" width="${f(Math.max(0,zA-zG))}" height="${ph}" fill="rgba(180,83,9,.07)"/>`);
+  o.push(`<rect x="${f(zA)}" y="${mt}" width="${f(Math.max(0,zR-zA))}" height="${ph}" fill="rgba(252,196,109,.13)"/>`);
+  if(zR<zE) o.push(`<rect x="${f(zR)}" y="${mt}" width="${f(zE-zR)}" height="${ph}" fill="rgba(100,116,139,.05)"/>`);
+  const lbY=mt+13;
+  o.push(`<text x="${ml+5}" y="${lbY}" ${lbF} fill="rgba(5,150,105,.8)">COMFORTABLE</text>`);
+  if(zA-zG>55) o.push(`<text x="${f((zG+zA)/2)}" y="${lbY}" text-anchor="middle" ${lbF} fill="rgba(180,83,9,.8)">MARGINAL</text>`);
+  if(zR-zA>35) o.push(`<text x="${f((zA+zR)/2)}" y="${lbY}" text-anchor="middle" ${lbF} fill="rgba(180,110,20,.85)">LATENCY↑</text>`);
+  if(zE-zR>45) o.push(`<text x="${f((zR+zE)/2)}" y="${lbY}" text-anchor="middle" ${lbF} fill="#94a3b8">GRID →</text>`);
+  yTickVals(yMax).forEach(t=>{
+    if(t===0)return;
+    const y=f(sy(t));
+    o.push(`<line x1="${ml}" y1="${y}" x2="${ml+pw}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>`);
+    o.push(`<text x="${ml-5}" y="${f(parseFloat(y)+3.5)}" text-anchor="end" font-size="9.5" fill="#94a3b8" ${txF}>${fmtMs(t)}</text>`);
+  });
+  visibleCM.forEach(m=>{
+    const c=getCeil(m);
+    const sel=(m.key===modelKey);
+    const x=sx(c);
+    if(x>ml&&x<=zE){
+      o.push(`<line x1="${f(x)}" y1="${mt}" x2="${f(x)}" y2="${mt+ph+5}" stroke="${m.color}" stroke-width="${sel?1.6:1.2}" stroke-dasharray="5,3" opacity="${sel?0.75:0.32}"/>`);
+      o.push(`<text x="${f(x-3)}" y="${mt+ph+23}" text-anchor="end" font-size="8.5" fill="${m.color}" font-weight="${sel?'700':'600'}" opacity="${sel?1:0.55}" ${txF}>${m.label}${sel?' \u25C4':''}</text>`);
+    }
+  });
+  const STEPS=280;
+  o.push(`<g clip-path="url(#cp${uid})">`);
+  visibleCM.forEach(m=>{
+    const c=getCeil(m);
+    const sel=(m.key===modelKey);
+    const pts=[];
+    for(let i=0;i<=STEPS;i++){
+      const x=(i/STEPS)*c;
+      pts.push({x,y:latCurve(x,c,m.baseMs)});
+    }
+    const d=pts.map((p,i)=>(i===0?'M':'L')+f(sx(p.x))+','+f(sy(p.y))).join(' ');
+    o.push(`<path d="${d}" fill="none" stroke="${m.color}" stroke-width="${sel?3:1.5}" opacity="${sel?1:0.4}" stroke-linejoin="round" stroke-linecap="round"/>`);
+  });
+  if(vis.proj&&projX!=null&&projX>0&&visibleCM.length){
+    let topY=Infinity,topX=0;
+    visibleCM.forEach(m=>{
+      const c=getCeil(m);
+      const px=Math.min(projX,c*0.9995);
+      const py=latCurve(px,c,m.baseMs);
+      const dx=f(sx(px)),dy=f(sy(py));
+      o.push(`<circle cx="${dx}" cy="${dy}" r="5" fill="white" stroke="${m.color}" stroke-width="2.5"/>`);
+      if(parseFloat(dy)<topY){topY=parseFloat(dy);topX=parseFloat(dx);}
+    });
+    o.push(`<text x="${f(topX)}" y="${f(topY-10)}" text-anchor="middle" font-size="9.5" fill="#334155" font-weight="700" ${txF}>+${projYrs}yr</text>`);
+  }
+  if(vis.now&&currentX!=null&&currentX>0&&visibleCM.length){
+    let topY=Infinity,topX=0;
+    visibleCM.forEach(m=>{
+      const c=getCeil(m);
+      const px=Math.min(currentX,c*0.9995);
+      const py=latCurve(px,c,m.baseMs);
+      const dx=f(sx(px)),dy=f(sy(py));
+      o.push(`<circle cx="${dx}" cy="${dy}" r="5.5" fill="${m.color}" stroke="white" stroke-width="2"/>`);
+      if(parseFloat(dy)<topY){topY=parseFloat(dy);topX=parseFloat(dx);}
+    });
+    o.push(`<text x="${f(topX)}" y="${f(topY-10)}" text-anchor="middle" font-size="9.5" fill="#0d1b2a" font-weight="700" ${txF}>NOW</text>`);
+  }
+  // StorM measured peak — orange diamond on every visible model curve
+  if(vis.storm&&stormX!=null&&stormX>0&&visibleCM.length){
+    let topY=Infinity,topX=0;
+    visibleCM.forEach(m=>{
+      const c=getCeil(m);
+      const px=Math.min(stormX,c*0.9995);
+      const py=latCurve(px,c,m.baseMs);
+      const dx=parseFloat(f(sx(px))), dy=parseFloat(f(sy(py)));
+      // diamond shape: 4 points around (dx,dy)
+      const r=6;
+      o.push(`<polygon points="${dx},${dy-r} ${dx+r},${dy} ${dx},${dy+r} ${dx-r},${dy}" fill="#ea580c" stroke="white" stroke-width="1.5"/>`);
+      if(dy<topY){topY=dy;topX=dx;}
+    });
+    o.push(`<text x="${f(topX)}" y="${f(topY-12)}" text-anchor="middle" font-size="9.5" fill="#ea580c" font-weight="700" ${txF}>MEASURED</text>`);
+  }
+  o.push('</g>');
+  o.push(`<line x1="${ml}" y1="${mt}" x2="${ml}" y2="${mt+ph}" stroke="#64748b" stroke-width="1.5"/>`);
+  o.push(`<line x1="${ml}" y1="${mt+ph}" x2="${ml+pw}" y2="${mt+ph}" stroke="#64748b" stroke-width="1.5"/>`);
+  if(vis.xaxis){
+    xTickVals(xMax).forEach(t=>{
+      const x=f(sx(t));
+      o.push(`<line x1="${x}" y1="${mt+ph}" x2="${x}" y2="${mt+ph+4}" stroke="#94a3b8" stroke-width="1"/>`);
+      o.push(`<text x="${x}" y="${mt+ph+16}" text-anchor="middle" font-size="9.5" fill="#64748b" ${txF}>${xFmt(t)}</text>`);
+    });
+    o.push(`<text x="${ml+pw/2}" y="${H-3}" text-anchor="middle" font-size="11" fill="#475569" font-weight="600" ${txF}>${xLabel}</text>`);
+  }
+  o.push(`<text x="12" y="${mt+ph/2}" text-anchor="middle" font-size="10.5" fill="#475569" font-weight="600" ${txF} transform="rotate(-90 12 ${mt+ph/2})">Latency (ms)</text>`);
+  o.push(`<text x="${ml+pw/2}" y="${mt-12}" text-anchor="middle" font-size="12.5" fill="#0d1b2a" font-weight="700" ${txF}>${title}</text>`);
+  o.push('</svg>');
+  return o.join('');
+}
+
+function gnPos(id){ const v=parseFloat($(id).value); return isFinite(v)&&v>0?v:null; }
+
+function drawCharts(){
+  const iops   =gn('iops');
+  const rate   =gn('pg_rate');
+  const yrs    =Math.max(1,gn('pg_yrs')||3);
+  const rp     =getReadPct();
+  const bk     =get('blkkb',FS.blkkb).val;
+  const wbk    =getWblk(bk).val;
+  const der    =get('derate',FS.derate).val;
+  const cm     =resolvedCM(); // resolved here once; passed into buildChart
+  const bwOf=v=>v==null?null:tputMB(v*(rp.val/100),v*((100-rp.val)/100),bk,wbk)/1000;
+  const curBw  =bwOf(iops);
+  let projIops=null,projBw=null;
+  if(iops!=null&&rate!=null&&rate>0){
+    projIops=iops*Math.pow(1+rate/100,yrs);
+    projBw  =bwOf(projIops);
+  }
+  // StorM peak values for chart markers (null when no data loaded)
+  let stormIops = null, stormBw = null;
+  if(stormData && stormData.peaks && stormData.peaks.length){
+    // peak[0] = Peak Total I/O Rate, peak[1] = Peak Total Data Rate (MiB/s → GB/s)
+    stormIops = stormData.peaks[0].total_io || null;
+    const peakDrMibs = stormData.peaks[1].total_dr || 0;
+    stormBw = peakDrMibs / MIB_PER_GBPS; // MiB/s → GB/s (decimal, matches ceilbw units)
+  }
+
+  // X-axis auto-scale floor = largest ceiling across all *visible* models so that
+  // selecting a smaller model (e.g. FS5600) never clips the FS9600/FS7600 curves
+  // off the right edge when those checkboxes are still ticked.
+  const visibleForScale = cm.filter(m=>vis[m.key]);
+  const scaleSet = visibleForScale.length ? visibleForScale : cm;
+  const iopsAutoMax = Math.max(
+    Math.max(...scaleSet.map(m=>m.satiops)),
+    (iops||0)*1.1,
+    (projIops||0)*1.1,
+    stormIops ? stormIops*1.15 : 0
+  );
+  const bwAutoMax = Math.max(
+    Math.max(...scaleSet.map(m=>m.ceilbw)),
+    stormBw ? stormBw*1.15 : 0
+  );
+
+  // read axis overrides (null = auto)
+  const iopsXmax = gnPos('iops_xmax');
+  const iopsYmax = gnPos('iops_ymax');
+  const bwXmax   = gnPos('bw_xmax');
+  const bwYmax   = gnPos('bw_ymax');
+
+  $('chartIops').innerHTML=buildChart({
+    uid:'iops',
+    title:'IOPS vs. Estimated Latency',
+    xMax: iopsXmax != null ? iopsXmax : iopsAutoMax*1.18,
+    yMaxOverride: iopsYmax,
+    xLabel:'Total IOPS',
+    xFmt:fmtIOPS,
+    getCeil:m=>m.satiops,
+    currentX:iops,
+    projX:projIops,
+    projYrs:yrs,
+    deratePct:der,
+    stormX:stormIops,
+    cm,
+  });
+  $('chartBw').innerHTML=buildChart({
+    uid:'bw',
+    title:'Throughput vs. Estimated Latency',
+    xMax: bwXmax != null ? bwXmax : bwAutoMax*1.18,
+    yMaxOverride: bwYmax,
+    xLabel:'Throughput (GB/s)',
+    xFmt:v=>v===0?'0':v<10?v.toFixed(1):Math.round(v)+'',
+    getCeil:m=>m.ceilbw,
+    currentX:curBw,
+    projX:projBw,
+    projYrs:yrs,
+    deratePct:der,
+    stormX:stormBw,
+    cm,
+  });
+  initZoomPan('wrapIops');
+  initZoomPan('wrapBw');
+  if(stormData) drawHeadroomChart();
+}
+
+// Zoom/pan for SVG charts
+const zoomStates = {};
+function initZoomPan(wrapId){
+  const wrap = $(wrapId);
+  if(!wrap) return;
+  const svg = wrap.querySelector('svg');
+  if(!svg) return;
+  if(!zoomStates[wrapId]){
+    zoomStates[wrapId] = {scale:1, tx:0, ty:0};
+  }
+  const state = zoomStates[wrapId];
+  svg.style.transform = `scale(${state.scale}) translate(${state.tx}px, ${state.ty}px)`;
+  wrap.onwheel = e => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    state.scale = Math.max(0.5, Math.min(state.scale * delta, 5));
+    svg.style.transform = `scale(${state.scale}) translate(${state.tx}px, ${state.ty}px)`;
+  };
+  let drag = null;
+  wrap.onmousedown = e => {
+    if(e.target.closest('.zoom-btn')) return;
+    drag = {sx:e.clientX, sy:e.clientY, ox:state.tx, oy:state.ty};
+  };
+  wrap.onmousemove = e => {
+    if(!drag) return;
+    state.tx = drag.ox + (e.clientX - drag.sx) / state.scale;
+    state.ty = drag.oy + (e.clientY - drag.sy) / state.scale;
+    svg.style.transform = `scale(${state.scale}) translate(${state.tx}px, ${state.ty}px)`;
+  };
+  wrap.onmouseup = () => drag = null;
+  wrap.onmouseleave = () => drag = null;
+}
+
+document.querySelectorAll('.zoom-btn').forEach(btn => {
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const action = btn.dataset.action;
+    const target = btn.dataset.zoomTarget;
+    const pngChart = btn.dataset.pngChart;
+    if(pngChart){
+      exportChartPNG(pngChart, btn.dataset.pngTitle||'chart');
+      return;
+    }
+    if(!target) return;
+    const state = zoomStates[target] || {scale:1, tx:0, ty:0};
+    zoomStates[target] = state;
+    if(action==='in') state.scale = Math.min(state.scale*1.3, 5);
+    else if(action==='out') state.scale = Math.max(state.scale/1.3, 0.5);
+    else if(action==='reset'){ state.scale=1; state.tx=0; state.ty=0; }
+    const wrap = $(target);
+    const svg = wrap.querySelector('svg');
+    svg.style.transform = `scale(${state.scale}) translate(${state.tx}px, ${state.ty}px)`;
+  });
+});
+
+const toggles=[
+  {chk:'chk_fs9600', vis_key:'fs9600', lbl:'cvis_fs9600'},
+  {chk:'chk_fs7600', vis_key:'fs7600', lbl:'cvis_fs7600'},
+  {chk:'chk_fs5600', vis_key:'fs5600', lbl:'cvis_fs5600'},
+  {chk:'chk_xaxis',  vis_key:'xaxis',  lbl:'cvis_xaxis'},
+  {chk:'chk_now',    vis_key:'now',     lbl:'cvis_now'},
+  {chk:'chk_proj',   vis_key:'proj',    lbl:'cvis_proj'},
+  {chk:'chk_storm',  vis_key:'storm',   lbl:'cvis_storm'},
+];
+toggles.forEach(({chk,vis_key,lbl})=>{
+  const el=$(chk);
+  if(!el) return;
+  el.addEventListener('change',function(){
+    vis[vis_key]=this.checked;
+    const wrap=$(lbl);
+    if(wrap) wrap.classList.toggle('dimmed',!this.checked);
+    drawCharts();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// StorM CSV IMPORT — parse Storage Insights CSVs, aggregate, find peaks
+// ═══════════════════════════════════════════════════════════════
+const COL_TIME=1, COL_READ_IO=7, COL_WRITE_IO=8, COL_TOTAL_IO=9,
+      COL_READ_CACHE=10, COL_READ_DR=13, COL_WRITE_DR=14, COL_TOTAL_DR=15;
+
+// ST-7: minimal RFC 4180-compliant CSV line splitter — handles quoted fields containing commas
+function splitCSVLine(line){
+  const out=[]; let cur=''; let inQ=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'){ inQ=!inQ; continue; }
+    if(c===',' && !inQ){ out.push(cur); cur=''; continue; }
+    cur+=c;
+  }
+  out.push(cur);
+  return out;
+}
+
+// ST-9: parse a timestamp string without relying on new Date()'s locale/timezone-dependent
+// implicit parser. Supports "M/D/YY HH:mm", "M/D/YYYY HH:mm", and ISO-8601 prefixes.
+// Rounds to the NEAREST 5-minute boundary (not ceiling) to avoid systematic forward bias.
+function parseAndRoundTime(raw){
+  raw = raw.trim();
+  let yr, mo, dy, hh, mm;
+  // try "M/D/YY HH:mm" or "M/D/YYYY HH:mm" (Storage Insights default export format)
+  const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+(\d{1,2}):(\d{2})/);
+  if(slashMatch){
+    mo = +slashMatch[1]-1; dy = +slashMatch[2];
+    yr = +slashMatch[3]; if(yr < 100) yr += 2000;
+    hh = +slashMatch[4]; mm = +slashMatch[5];
+  } else {
+    // ISO-8601: "YYYY-MM-DDTHH:mm" or "YYYY-MM-DD HH:mm"
+    const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+    if(isoMatch){
+      yr = +isoMatch[1]; mo = +isoMatch[2]-1; dy = +isoMatch[3];
+      hh = +isoMatch[4]; mm = +isoMatch[5];
+    } else {
+      throw new Error('Unrecognised timestamp format: '+raw);
+    }
+  }
+  // round to nearest 5-minute boundary
+  const rem = mm % 5;
+  if(rem !== 0){
+    if(rem >= 3){ // round up
+      mm += (5-rem);
+      if(mm >= 60){ mm -= 60; hh += 1; }
+      if(hh >= 24){ hh -= 24; dy += 1; } // day rollover (edge case)
+    } else {      // round down
+      mm -= rem;
+    }
+  }
+  return `${mo+1}/${dy}/${String(yr).slice(-2)} ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+}
+
+function safeFloat(v){ const f=parseFloat(v); return isFinite(f)?f:0; }
+function roundUp(v){ return Math.ceil(v); }
+
+function parseStorMCSV(csvText){
+  // strip UTF-8 BOM if present
+  if(csvText.charCodeAt(0)===0xFEFF) csvText=csvText.slice(1);
+  const lines = csvText.trim().split(/\r?\n/);
+  const rows = [];
+  for(let i=1; i<lines.length; i++){
+    const line = splitCSVLine(lines[i]);
+    if(line.length <= COL_TOTAL_DR) continue;
+    try{
+      const adj_time = parseAndRoundTime(line[COL_TIME]);
+      rows.push({
+        adj_time,
+        read_io:     safeFloat(line[COL_READ_IO]),
+        write_io:    safeFloat(line[COL_WRITE_IO]),
+        total_io:    safeFloat(line[COL_TOTAL_IO]),
+        read_cache:  safeFloat(line[COL_READ_CACHE]),
+        read_dr:     safeFloat(line[COL_READ_DR]),
+        write_dr:    safeFloat(line[COL_WRITE_DR]),
+        total_dr:    safeFloat(line[COL_TOTAL_DR]),
+      });
+    } catch(e){}
+  }
+  return rows;
+}
+
+function aggregateStorM(allFileRows){
+  const nFiles = allFileRows.length;
+  const totals = {};
+  allFileRows.forEach((fileRows, fileIndex) => {
+    fileRows.forEach(row => {
+      const t = row.adj_time;
+      if(!totals[t]){
+        totals[t] = {read_io:0, write_io:0, total_io:0, read_cache_num:0,
+                     read_dr:0, write_dr:0, total_dr:0, contributors:0};
+      }
+      totals[t].read_io        += row.read_io;
+      totals[t].write_io       += row.write_io;
+      totals[t].total_io       += row.total_io;
+      totals[t].read_cache_num += row.read_cache * row.read_io;
+      totals[t].read_dr        += row.read_dr;
+      totals[t].write_dr       += row.write_dr;
+      totals[t].total_dr       += row.total_dr;
+      totals[t].contributors   += 1;
+    });
+  });
+  const results = {};
+  let incompleteCnt = 0;
+  for(const t in totals){
+    const d = totals[t];
+    if(d.contributors < nFiles) incompleteCnt++;
+    const read_io  = d.read_io;
+    const write_io = d.write_io;
+    const total_io = d.total_io;
+    const read_dr  = d.read_dr;
+    const write_dr = d.write_dr;
+    const total_dr = d.total_dr;
+    const wtd_cache = read_io>0 ? roundUp(d.read_cache_num / read_io) : 0;
+    const read_xfer = read_io>0 ? roundUp((read_dr*1024)/read_io) : 0;
+    const write_xfer= write_io>0? roundUp((write_dr*1024)/write_io): 0;
+    const read_pct  = total_io>0? roundUp((read_io/total_io)*100) : 0;
+    results[t] = {
+      read_io:     roundUp(read_io),
+      write_io:    roundUp(write_io),
+      total_io:    roundUp(total_io),
+      read_dr:     roundUp(read_dr),
+      write_dr:    roundUp(write_dr),
+      total_dr:    roundUp(total_dr),
+      wtd_cache,
+      read_xfer,
+      write_xfer,
+      read_pct,
+    };
+  }
+  const totalTimestamps = Object.keys(results).length;
+  return {results, incompleteCnt, totalTimestamps};
+}
+
+function findPeaksStorM(results){
+  const PEAK_METRICS = [
+    ['Peak Total I/O Rate - overall (ops/s)', 'total_io'],
+    ['Peak Total Data Rate (MiB/s)',           'total_dr'],
+    ['Peak Write I/O Rate - overall (ops/s)',  'write_io'],
+    ['Peak Write Data Rate (MiB/s)',           'write_dr'],
+  ];
+  const peaks = [];
+  PEAK_METRICS.forEach(([label, metric_key]) => {
+    const peak_time = Object.keys(results).reduce((a,b)=>
+      results[b][metric_key]>results[a][metric_key]?b:a);
+    const d = results[peak_time];
+    peaks.push({
+      description:  label,
+      time:         peak_time,
+      read_pct:     d.read_pct,
+      total_io:     d.total_io,
+      read_xfer:    d.read_xfer,
+      write_xfer:   d.write_xfer,
+      wtd_cache:    d.wtd_cache,
+      total_dr:     d.total_dr,
+      write_io:     d.write_io,
+      write_dr:     d.write_dr,
+    });
+  });
+  return peaks;
+}
+
+function handleStorMFiles(files){
+  const allFileRows = [];
+  let loaded = 0;
+  Array.from(files).forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try{
+        const rows = parseStorMCSV(e.target.result);
+        allFileRows.push(rows);
+      } catch(err){
+        console.error('Parse error:', err);
+      }
+      loaded++;
+      if(loaded === files.length){
+        if(allFileRows.length===0){
+          $('stormStatusBadge').className='storm-status error';
+          $('stormStatusBadge').textContent='Parse error';
+          return;
+        }
+        const {results: aggregated, incompleteCnt, totalTimestamps} = aggregateStorM(allFileRows);
+        const peaks = findPeaksStorM(aggregated);
+        stormData = {aggregated, peaks, incompleteCnt, totalTimestamps};
+        displayStorMResults(peaks, incompleteCnt, totalTimestamps);
+        drawCharts();
+      }
+    };
+    reader.readAsText(file);
+  });
+}
+
+function displayStorMResults(peaks, incompleteCnt, totalTimestamps){
+  // ST-8: completeness warning — only shown when >1% of timestamps have gaps,
+  // to avoid alerting on trivial single-row export mismatches
+  const gapPct = totalTimestamps > 0 ? incompleteCnt / totalTimestamps : 0;
+  const coverageWarn = (gapPct > 0.01)
+    ? `<div style="margin-bottom:8px;padding:7px 10px;background:#fff7ed;border-left:3px solid #ea580c;border-radius:0 5px 5px 0;font-size:11.5px;color:#5a3010">
+        ⚠ <strong>${incompleteCnt} of ${totalTimestamps} timestamps</strong> have partial system coverage (not all imported files had data for that window). Aggregated peaks for those windows may be <strong>understated</strong>.
+       </div>`
+    : '';
+  const tbody = $('stormPeakBody');
+  // inject warning above table if needed
+  const tableWrap = tbody.closest('div');
+  let warnEl = $('stormCoverageWarn');
+  if(!warnEl){
+    warnEl = document.createElement('div');
+    warnEl.id = 'stormCoverageWarn';
+    tableWrap.parentNode.insertBefore(warnEl, tableWrap);
+  }
+  warnEl.innerHTML = coverageWarn;
+  tbody.innerHTML = peaks.map(p => `<tr>
+    <td>${p.description}</td>
+    <td>${p.time}</td>
+    <td>${p.read_pct}%</td>
+    <td>${p.total_io.toLocaleString()}</td>
+    <td>${p.read_xfer.toLocaleString()}</td>
+    <td>${p.write_xfer.toLocaleString()}</td>
+    <td>${p.wtd_cache}%</td>
+  </tr>`).join('');
+  $('stormResultsArea').style.display='block';
+  $('stormStatusBadge').className='storm-status loaded';
+  $('stormStatusBadge').textContent=`${peaks.length} peaks loaded`;
+  $('stormClearBtn').style.display='inline-block';
+  $('boxHeadroom').style.display='block';
+  const m = MODELS[modelKey];
+  const cD = get('derate', FS.derate).val;
+  const comfortIOPS = m.satiops * (cD/100);
+  const peakIO = Math.max(...peaks.map(p=>p.total_io));
+  const headroom = ((comfortIOPS - peakIO) / comfortIOPS * 100).toFixed(1);
+  $('stormHeadroomGrid').innerHTML = `
+    <div class="sh-item">
+      <div class="sh-lbl">Peak Total IOPS (measured)</div>
+      <div class="sh-val">${peakIO.toLocaleString()}</div>
+      <div class="sh-sub">from ${peaks[0].time}</div>
+    </div>
+    <div class="sh-item">
+      <div class="sh-lbl">New ${m.name} Comfortable Ceiling</div>
+      <div class="sh-val">${comfortIOPS.toLocaleString()} IOPS</div>
+      <div class="sh-sub">Headroom: ${headroom}%</div>
+    </div>`;
+}
+
+function drawHeadroomChart(){
+  if(!stormData) return;
+  const peaks = stormData.peaks;
+  const m = MODELS[modelKey];
+  const cD = get('derate', FS.derate).val;
+
+  // ── Two panels side by side: left = IOPS metrics, right = Data Rate metrics ──
+  // peaks[0] = Peak Total IOPS,  peaks[2] = Peak Write IOPS  → left panel
+  // peaks[1] = Peak Total DR,    peaks[3] = Peak Write DR    → right panel
+  const iopsMetrics = [peaks[0], peaks[2]];
+  const drMetrics   = [peaks[1], peaks[3]];
+
+  const comfortIOPS = m.satiops * (cD/100);
+  const satIOPS     = m.satiops;
+  const comfortBW   = m.ceilbw * (cD/100) * MIB_PER_GBPS; // GB/s → MiB/s (correct SI conversion)
+  const satBW       = m.ceilbw * MIB_PER_GBPS;             // GB/s → MiB/s
+
+  const W=960, H=380;
+  const f = n => (+n).toFixed(1);
+  const txF = `font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif"`;
+
+  // panel geometry — two equal panels with a divider gap
+  const panelGap=40, ml=90, mr=20, mt=52, mb=72;
+  const panelW = (W - ml - mr - panelGap) / 2;
+  const ph = H - mt - mb;
+
+  // ── helper: draw one grouped-bar panel ──
+  // metrics: [{label, measured}]  ceiling: {comfort, sat}  yUnit: string
+  // returns SVG fragment string; ox = left edge of panel plot area
+  function panel(metrics, ceiling, yUnit, ox, panelTitle){
+    const maxVal = Math.max(ceiling.sat, ...metrics.map(d=>d.measured)) * 1.12;
+    const sy = v => mt + ph - Math.max(0, (v/maxVal)*ph);
+
+    // 3 bars per metric group: measured | comfortable | saturation
+    // slot width = panelW / nMetrics
+    const nM = metrics.length;
+    const slotW = panelW / nM;
+    const bw = Math.min(slotW * 0.22, 36);   // each bar width
+    const grpW = bw*3 + bw*0.4*2;            // total group width (3 bars + 2 inner gaps)
+    const grpGap = bw * 0.4;
+
+    let o = [];
+
+    // panel background clip
+    o.push(`<rect x="${f(ox)}" y="${mt}" width="${f(panelW)}" height="${ph}" fill="none"/>`);
+
+    // Y grid + ticks
+    const nTicks = 5;
+    for(let i=0;i<=nTicks;i++){
+      const v = (maxVal/nTicks)*i;
+      const y = f(sy(v));
+      o.push(`<line x1="${f(ox)}" y1="${y}" x2="${f(ox+panelW)}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>`);
+      // left Y labels only for left panel
+      if(ox < W/2){
+        const lbl = yUnit==='IOPS' ? fmtIOPS(v) : (v>=1000?(v/1000).toFixed(1)+'K':Math.round(v)+'');
+        o.push(`<text x="${f(ox-8)}" y="${f(parseFloat(y)+3.5)}" text-anchor="end" font-size="9.5" fill="#64748b" ${txF}>${lbl}</text>`);
+      } else {
+        const lbl = yUnit==='MiB/s' ? (v>=1000?(v/1000).toFixed(1)+'K':Math.round(v)+'') : fmtIOPS(v);
+        o.push(`<text x="${f(ox+panelW+5)}" y="${f(parseFloat(y)+3.5)}" text-anchor="start" font-size="9.5" fill="#64748b" ${txF}>${lbl}</text>`);
+      }
+    }
+
+    // axes
+    o.push(`<line x1="${f(ox)}" y1="${mt}" x2="${f(ox)}" y2="${mt+ph}" stroke="#64748b" stroke-width="1.5"/>`);
+    o.push(`<line x1="${f(ox)}" y1="${mt+ph}" x2="${f(ox+panelW)}" y2="${mt+ph}" stroke="#64748b" stroke-width="1.5"/>`);
+
+    // bar groups
+    metrics.forEach((d, i) => {
+      const slotCx = ox + (i + 0.5) * slotW;
+      const gx = slotCx - grpW/2;
+
+      const yM = sy(d.measured);
+      const yC = sy(ceiling.comfort);
+      const yS = sy(ceiling.sat);
+
+      // measured bar
+      o.push(`<rect x="${f(gx)}" y="${f(yM)}" width="${f(bw)}" height="${f(mt+ph-yM)}" fill="#ea580c" opacity="0.85" rx="2"/>`);
+      // comfortable ceiling bar
+      o.push(`<rect x="${f(gx+bw+grpGap)}" y="${f(yC)}" width="${f(bw)}" height="${f(mt+ph-yC)}" fill="#00b4d8" opacity="0.7" rx="2"/>`);
+      // saturation bar
+      o.push(`<rect x="${f(gx+2*bw+2*grpGap)}" y="${f(yS)}" width="${f(bw)}" height="${f(mt+ph-yS)}" fill="#94a3b8" opacity="0.5" rx="2"/>`);
+
+      // value labels above bars
+      const measLbl = yUnit==='IOPS' ? fmtIOPS(d.measured) : Math.round(d.measured)+'';
+      o.push(`<text x="${f(gx+bw/2)}" y="${f(yM-4)}" text-anchor="middle" font-size="8.5" fill="#ea580c" font-weight="700" ${txF}>${measLbl}</text>`);
+
+      // headroom % label
+      const headroom = ceiling.comfort>0 ? Math.max(0,((ceiling.comfort - d.measured)/ceiling.comfort*100)).toFixed(0) : '—';
+      o.push(`<text x="${f(slotCx)}" y="${f(mt+ph+14)}" text-anchor="middle" font-size="8.5" fill="#64748b" ${txF}>${d.label}</text>`);
+      o.push(`<text x="${f(slotCx)}" y="${f(mt+ph+26)}" text-anchor="middle" font-size="9" fill="${+headroom>30?'#059669':+headroom>10?'#d97706':'#dc2626'}" font-weight="700" ${txF}>${headroom}% headroom</text>`);
+    });
+
+    // panel title
+    o.push(`<text x="${f(ox+panelW/2)}" y="${mt-18}" text-anchor="middle" font-size="11" fill="#1e3a5f" font-weight="700" ${txF}>${panelTitle}</text>`);
+
+    // Y-axis unit label
+    const axX = ox < W/2 ? ox-60 : ox+panelW+50;
+    o.push(`<text x="${f(axX)}" y="${f(mt+ph/2)}" text-anchor="middle" font-size="9.5" fill="#475569" font-weight="600" ${txF} transform="rotate(-90 ${f(axX)} ${f(mt+ph/2)})">${yUnit}</text>`);
+
+    return o.join('');
+  }
+
+  // ── build metric objects ──
+  const iopsPanel = iopsMetrics.map(p=>({
+    measured: p.total_io,
+    label: p.description.replace('Peak ','').replace(' I/O Rate - overall (ops/s)','').replace(' I/O Rate','')
+  }));
+  const drPanel = drMetrics.map(p=>({
+    measured: p.total_dr,    // already MiB/s from StorM
+    label: p.description.replace('Peak ','').replace(' Data Rate (MiB/s)','').replace(' Data Rate','')
+  }));
+
+  const oxLeft  = ml;
+  const oxRight = ml + panelW + panelGap;
+
+  let svgParts = [];
+  svgParts.push(`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">`);
+
+  // overall title
+  svgParts.push(`<text x="${W/2}" y="22" text-anchor="middle" font-size="13" fill="#0d1b2a" font-weight="700" ${txF}>Current Measured Performance vs. New ${m.name} Headroom</text>`);
+
+  // divider between panels
+  svgParts.push(`<line x1="${f(oxLeft+panelW+panelGap/2)}" y1="${mt-10}" x2="${f(oxLeft+panelW+panelGap/2)}" y2="${mt+ph+40}" stroke="#e2e8f0" stroke-width="1.5" stroke-dasharray="4,3"/>`);
+
+  // render both panels
+  svgParts.push(panel(iopsPanel,
+    {comfort:comfortIOPS, sat:satIOPS},
+    'IOPS', oxLeft, 'I/O Rate (IOPS)'));
+  svgParts.push(panel(drPanel,
+    {comfort:comfortBW, sat:satBW},
+    'MiB/s', oxRight, 'Data Rate (MiB/s)'));
+
+  // shared legend
+  const legY = mt + ph + 50;
+  const legItems = [
+    {color:'#ea580c', label:'Measured Peak', opacity:0.85},
+    {color:'#00b4d8', label:`New ${m.name} Comfortable (${cD}% derate)`, opacity:0.7},
+    {color:'#94a3b8', label:'New System Saturation',  opacity:0.5},
+  ];
+  let lx = ml;
+  legItems.forEach(it=>{
+    svgParts.push(`<rect x="${f(lx)}" y="${legY}" width="12" height="10" fill="${it.color}" opacity="${it.opacity}" rx="2"/>`);
+    svgParts.push(`<text x="${f(lx+16)}" y="${legY+8}" font-size="9.5" fill="#64748b" ${txF}>${it.label}</text>`);
+    lx += it.label.length*5.5 + 30;
+  });
+
+  svgParts.push('</svg>');
+  $('chartHeadroom').innerHTML = svgParts.join('');
+  initZoomPan('wrapHeadroom');
+}
+
+const dropZone = $('stormDropZone');
+const fileInput = $('stormFileInput');
+dropZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => {
+  if(e.target.files.length>0) handleStorMFiles(e.target.files);
+});
+dropZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropZone.classList.add('dragover');
+});
+dropZone.addEventListener('dragleave', () => {
+  dropZone.classList.remove('dragover');
+});
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  if(e.dataTransfer.files.length>0) handleStorMFiles(e.dataTransfer.files);
+});
+// headroom chart toggle — rotate arrow on open/close
+$('boxHeadroom').addEventListener('toggle', function(){
+  const arrow = $('headroomArrow');
+  if(arrow) arrow.style.transform = this.open ? 'rotate(90deg)' : 'rotate(0deg)';
+});
+
+$('stormClearBtn').addEventListener('click', () => {
+  stormData = null;
+  $('stormResultsArea').style.display='none';
+  $('stormStatusBadge').className='storm-status empty';
+  $('stormStatusBadge').textContent='No data loaded';
+  $('stormClearBtn').style.display='none';
+  $('boxHeadroom').style.display='none';
+  fileInput.value = '';
+  drawCharts();
+});
+
+// ═══════════════════════════════════════════════════════════════
+// PNG EXPORT — convert SVG chart to PNG and download
+// ═══════════════════════════════════════════════════════════════
+function exportChartPNG(chartId, title){
+  const chartEl = $(chartId);
+  if(!chartEl) return;
+  const svg = chartEl.querySelector('svg');
+  if(!svg) return;
+  const svgData = new XMLSerializer().serializeToString(svg);
+  const canvas = document.createElement('canvas');
+  const bbox = svg.getBBox();
+  canvas.width = bbox.width * 2;
+  canvas.height = bbox.height * 2;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const img = new Image();
+  const blob = new Blob([svgData], {type:'image/svg+xml;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  img.onload = () => {
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `FlashSystem-${title}-${new Date().toISOString().slice(0,10)}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  };
+  img.src = url;
+}
+
+$('btnPngExport').addEventListener('click', () => {
+  exportChartPNG('chartIops', 'IOPS-Latency');
+  setTimeout(() => exportChartPNG('chartBw', 'Throughput-Latency'), 200);
+  if(stormData) setTimeout(() => exportChartPNG('chartHeadroom', 'Headroom'), 400);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// CSV EXPORT — all sizing results as a downloadable .csv file
+// ═══════════════════════════════════════════════════════════════
+function buildSizingCSV(){
+  const m  = MODELS[modelKey];
+  const rp = getReadPct();
+  const bk = get('blkkb',   FS.blkkb);
+  const wbk= getWblk(bk.val);
+  const iops = gn('iops');
+  const capnow = gn('capnow');
+  const rtt = gn('rtt');
+  const link = gn('linkgbps');
+
+  const row = (label, value) => `"${label}","${value}"\r\n`;
+  const sep = label => `\r\n"=== ${label} ==="\r\n`;
+
+  let csv = '';
+
+  // ── Inputs ──
+  csv += sep('INPUTS');
+  csv += row('Model', `${m.name} (${m.mtm})`);
+  csv += row('Total IOPS', iops != null ? iops : '—');
+  csv += row('Read %', rp.assumed ? `${rp.val} (assumed)` : rp.val);
+  csv += row('Write %', 100 - rp.val);
+  csv += row('Read block size (KiB)', bk.assumed ? `${bk.val} (assumed)` : bk.val);
+  csv += row('Write block size (KiB)', wbk.assumed ? `${wbk.val} (assumed)` : wbk.val);
+  csv += row('Data today (TB)', gn('capnow') != null ? gn('capnow') : '—');
+  csv += row('Growth (TB)', gn0('capgrow') != null ? gn0('capgrow') : '0');
+  const gr = get('reduction', FS.reduction);
+  csv += row('Data reduction ratio', gr.assumed ? `${gr.val}:1 (assumed)` : `${gr.val}:1`);
+  const tg = get('target', FS.target);
+  csv += row('Target usage %', tg.assumed ? `${tg.val} (assumed)` : tg.val);
+  csv += row('RTT (ms)', rtt != null ? rtt : '—');
+  csv += row('WAN link (Gbps)', link != null ? link : '—');
+  const sc = get('streamcomp', FS.streamcomp);
+  csv += row('Stream compression', sc.assumed ? `${sc.val}:1 (assumed)` : `${sc.val}:1`);
+
+  // ── Performance ──
+  if(iops != null){
+    const writepct = 100 - rp.val;
+    const readIops  = iops * (rp.val / 100);
+    const writeIops = iops * (writepct / 100);
+    const totalMBs  = tputMB(readIops, writeIops, bk.val, wbk.val);
+    const totalGBs  = totalMBs / 1000;
+    const cS = get('satiops', FS.satiops);
+    const cD = get('derate',  FS.derate);
+    const cBw= get('ceilbw',  FS.ceilbw);
+    const satIops   = cS.val;
+    const usable    = satIops * (cD.val / 100);
+    const iopsUtil  = (iops / satIops) * 100;
+    const bwUtil    = (totalGBs / cBw.val) * 100;
+    const latMs     = latCurve(iops, satIops, FS.baseMs);
+    csv += sep('PERFORMANCE');
+    csv += row('Read IOPS', Math.round(readIops));
+    csv += row('Write IOPS', Math.round(writeIops));
+    csv += row('Total throughput (MB/s)', totalMBs.toFixed(0));
+    csv += row('Total throughput (GB/s)', totalGBs.toFixed(2));
+    csv += row('Mixed-workload saturation (IOPS)', satIops);
+    csv += row('Comfortable ceiling (IOPS)', Math.round(usable));
+    csv += row('Core utilisation %', iopsUtil.toFixed(1));
+    csv += row('Bandwidth ceiling (GB/s)', cBw.val);
+    csv += row('Bandwidth utilisation %', bwUtil.toFixed(1));
+    csv += row('Est. latency at this load (ms)', latMs < 1 ? latMs.toFixed(2) : latMs.toFixed(1));
+  }
+
+  // ── Capacity ──
+  if(capnow != null){
+    const grow = gn0('capgrow') || 0;
+    const gr2  = get('reduction', FS.reduction);
+    const tg2  = get('target',    FS.target);
+    const mx   = get('maxpbe',    FS.maxpbe);
+    const cv   = get('cvpct', 10);
+    const syncLim  = get('syncrtt',  FS.syncrtt);
+    const asyncLim = get('asyncrtt', FS.asyncrtt);
+    const isPbrAsync = rtt != null && rtt > syncLim.val && rtt <= asyncLim.val;
+    const totalLogTB = capnow + grow;
+    const changeVolTB = isPbrAsync ? totalLogTB * (cv.val / 100) : 0;
+    const effTB  = (totalLogTB + changeVolTB) / (tg2.val / 100);
+    const effPB  = effTB / 1000;
+    const capUtil = (effPB / mx.val) * 100;
+    csv += sep('CAPACITY');
+    csv += row('Total logical data (TB)', totalLogTB);
+    csv += row('Physical flash consumed (TB)', (totalLogTB / gr2.val).toFixed(1));
+    if(isPbrAsync) csv += row('Change volume reserve (TB)', changeVolTB.toFixed(1));
+    csv += row('Effective capacity needed (TB)', effTB.toFixed(1));
+    csv += row('Effective capacity needed (PBe)', effPB.toFixed(3));
+    csv += row('Array max effective capacity (PBe)', mx.val);
+    csv += row('Capacity utilisation %', capUtil.toFixed(1));
+  }
+
+  // ── Replication ──
+  if(rtt != null){
+    const syncLim  = get('syncrtt',  FS.syncrtt);
+    const asyncLim = get('asyncrtt', FS.asyncrtt);
+    const isSync    = rtt <= syncLim.val;
+    const overAsync = rtt > asyncLim.val;
+    const mode = overAsync ? 'Beyond PBR limit' : isSync ? 'PBHA Sync' : 'PBR Async';
+    csv += sep('REPLICATION');
+    csv += row('RTT (ms)', rtt);
+    csv += row('Mode', mode);
+    if(iops != null){
+      const writepct  = 100 - rp.val;
+      const writeIops = iops * (writepct / 100);
+      const writeMBs  = tputMB(0, writeIops, bk.val, wbk.val);
+      const sc2 = get('streamcomp', FS.streamcomp);
+      const onWireMBs = writeMBs / sc2.val;
+      const bufferMB  = isSync ? writeMBs * (rtt / 1000) : 0;
+      csv += row('Write throughput (MB/s)', writeMBs.toFixed(0));
+      csv += row('On-wire after compression (MB/s)', onWireMBs.toFixed(0));
+      if(link != null){
+        const usableMBs = link * 125 * 0.80;
+        csv += row('Link usable (MB/s)', usableMBs.toFixed(0));
+        csv += row('Link utilisation %', ((onWireMBs / usableMBs) * 100).toFixed(1));
+      }
+      if(isSync) csv += row('PBHA journal buffer (MB)', bufferMB.toFixed(0));
+    }
+  }
+
+  // ── StorM peaks ──
+  if(stormData && stormData.peaks){
+    csv += sep('STORM MEASURED PEAKS');
+    csv += `"Metric","Timestamp","Read %","Total IOPS","Avg Rd Xfer (KiB)","Avg Wr Xfer (KiB)","Cache Hit %"\r\n`;
+    stormData.peaks.forEach(p => {
+      csv += `"${p.description}","${p.time}","${p.read_pct}%","${p.total_io}","${p.read_xfer}","${p.write_xfer}","${p.wtd_cache}%"\r\n`;
+    });
+    if(stormData.incompleteCnt > 0){
+      csv += row('Coverage warning', `${stormData.incompleteCnt} of ${stormData.totalTimestamps} timestamps had partial system coverage`);
+    }
+  }
+
+  csv += `\r\n"Generated","${new Date().toLocaleString()}"\r\n`;
+  csv += `"Tool","IBM FlashSystem SV 9.1.2 Sizing Calculator"\r\n`;
+  return csv;
+}
+
+$('btnExcelExport').addEventListener('click', () => {
+  const csv  = buildSizingCSV();
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `FlashSystem-Sizing-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// PDF EXPORT — browser print
+// ═══════════════════════════════════════════════════════════════
+$('btnPdfExport').addEventListener('click', () => {
+  const m = MODELS[modelKey];
+  const hdrEl = $('printHeader');
+  hdrEl.innerHTML = `<h2>IBM FlashSystem Sizing Proposal</h2>
+    <div class="pph-sub">IBM ${m.name} (${m.mtm}) · Storage Virtualize 9.1.2 · Generated ${new Date().toLocaleDateString()}</div>`;
+  const perfSec = $('perfSection');
+  const wasOpen = perfSec.open;
+  perfSec.open = true;
+  window.print();
+  setTimeout(() => { perfSec.open = wasOpen; }, 500);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+applyModel($('model').value);
+
+})();
+</script>
+</div><!-- /wrap -->
+
